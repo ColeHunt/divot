@@ -225,6 +225,26 @@ Until this is set up, "forgot password" on the live site quietly logs the
 reset link to the container's stdout (`docker compose logs divot`) instead of
 emailing it — useful for testing the flow before wiring up Resend for real.
 
+### Admins
+
+Admins can edit or delete any course in the shared library (a regular
+account can only add new ones). There's no in-app way to grant this — it's a
+deliberate gap, done from the server itself:
+
+```bash
+# Docker (Path B)
+docker exec divot node server/dist/server/src/adminCli.js grant you@example.com
+docker exec divot node server/dist/server/src/adminCli.js list
+docker exec divot node server/dist/server/src/adminCli.js revoke someone@example.com
+
+# systemd (Path A)
+sudo -u divot node /srv/divot/server/dist/server/src/adminCli.js grant you@example.com
+```
+
+The account has to already exist (sign up first, then grant). Takes effect
+immediately — no restart needed, and the next `/api/auth/me` (or next
+sign-in) picks it up.
+
 ## Backups
 
 Everything is in one SQLite file — accounts, friendships, courses and every

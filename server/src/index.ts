@@ -19,6 +19,7 @@ import {
 import { checkRateLimit, clearRateLimit } from './rateLimit.js';
 import { confirmPasswordReset, requestPasswordReset } from './passwordReset.js';
 import { AvatarError, getAvatar, removeAvatar, setAvatar } from './avatars.js';
+import { isAdmin } from './admins.js';
 import { attachHub, broadcastRound } from './hub.js';
 import {
   FriendError,
@@ -32,6 +33,7 @@ import {
 import {
   CourseError,
   createCourse,
+  deleteCourse,
   getCourse,
   getLastRound,
   isSaved,
@@ -39,6 +41,7 @@ import {
   saveCourse,
   searchCourses,
   unsaveCourse,
+  updateCourse,
 } from './courses.js';
 import { isValidRoundCode, normaliseRoundCode } from './ids.js';
 import {
@@ -82,6 +85,7 @@ function errorStatus(code: string): number {
     case 'round_full':
     case 'not_your_request':
     case 'not_a_player':
+    case 'has_rounds':
       return 409;
     case 'bad_credentials':
     case 'invalid_reset_token':
@@ -115,7 +119,7 @@ export function createApp(): express.Express {
       const user = register(req.body?.email, req.body?.password, req.body?.name);
       const token = createSession(user.id);
       setSessionCookie(res, token, true);
-      res.status(201).json({ user });
+      res.status(201).json({ user, isAdmin: false });
     } catch (error) {
       if (error instanceof UserError) {
         res.status(errorStatus(error.code)).json({ error: error.code, message: error.message });
@@ -136,7 +140,7 @@ export function createApp(): express.Express {
       clearRateLimit(rateLimitKey);
       const token = createSession(user.id);
       setSessionCookie(res, token, req.body?.remember !== false);
-      res.json({ user });
+      res.json({ user, isAdmin: isAdmin(user.id) });
     } catch (error) {
       if (error instanceof UserError) {
         res.status(errorStatus(error.code)).json({ error: error.code, message: error.message });
@@ -163,7 +167,7 @@ export function createApp(): express.Express {
       res.status(401).json({ error: 'not_authenticated' });
       return;
     }
-    res.json({ user });
+    res.json({ user, isAdmin: isAdmin(user.id) });
   });
 
   app.post('/api/auth/forgot-password', async (req, res) => {
@@ -184,7 +188,7 @@ export function createApp(): express.Express {
       const user = confirmPasswordReset(req.body?.token, req.body?.password);
       const token = createSession(user.id);
       setSessionCookie(res, token, true);
-      res.json({ user });
+      res.json({ user, isAdmin: isAdmin(user.id) });
     } catch (error) {
       if (error instanceof UserError) {
         res.status(errorStatus(error.code)).json({ error: error.code, message: error.message });
@@ -197,10 +201,18 @@ export function createApp(): express.Express {
   const api = express.Router();
   api.use(requireAuth);
 
+  function requireAdmin(req: AuthedRequest, res: express.Response, next: express.NextFunction): void {
+    if (!isAdmin(req.userId)) {
+      res.status(403).json({ error: 'not_admin', message: 'Admins only' });
+      return;
+    }
+    next();
+  }
+
   api.patch('/auth/me', (req: AuthedRequest, res) => {
     try {
       const user = updateName(req.userId!, req.body?.name);
-      res.json({ user });
+      res.json({ user, isAdmin: isAdmin(user.id) });
     } catch (error) {
       if (error instanceof UserError) {
         res.status(errorStatus(error.code)).json({ error: error.code, message: error.message });
@@ -338,6 +350,32 @@ export function createApp(): express.Express {
         saved: isSaved(req.userId!, course.id),
         lastRound: getLastRound(req.userId!, course.id),
       });
+    } catch (error) {
+      if (error instanceof CourseError) {
+        res.status(errorStatus(error.code)).json({ error: error.code, message: error.message });
+        return;
+      }
+      throw error;
+    }
+  });
+
+  api.patch('/courses/:id', requireAdmin, (req: AuthedRequest, res) => {
+    try {
+      const course = updateCourse(req.params.id!, req.body?.name, req.body?.location, req.body?.holes);
+      res.json({ course });
+    } catch (error) {
+      if (error instanceof CourseError) {
+        res.status(errorStatus(error.code)).json({ error: error.code, message: error.message });
+        return;
+      }
+      throw error;
+    }
+  });
+
+  api.delete('/courses/:id', requireAdmin, (req: AuthedRequest, res) => {
+    try {
+      deleteCourse(req.params.id!);
+      res.json({ ok: true });
     } catch (error) {
       if (error instanceof CourseError) {
         res.status(errorStatus(error.code)).json({ error: error.code, message: error.message });

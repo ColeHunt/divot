@@ -37,6 +37,15 @@ function migrate(instance: Db): void {
       created_at    INTEGER NOT NULL
     );
 
+    -- Presence of a row means that user has admin rights (currently: editing
+    -- and deleting any course in the shared library). Granted by hand only —
+    -- server/src/adminCli.ts, run on the box itself — there is no self-serve
+    -- "become an admin" path anywhere in the app.
+    CREATE TABLE IF NOT EXISTS admins (
+      user_id    TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      granted_at INTEGER NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS sessions (
       token      TEXT PRIMARY KEY,
       user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

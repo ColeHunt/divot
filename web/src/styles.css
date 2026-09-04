@@ -215,7 +215,14 @@ button:focus-visible {
   flex-direction: column;
   align-items: center;
   gap: 0.15rem;
-  padding: 0.6rem 0.25rem;
+  /* A bit more than a plain 0.6rem — on a home-indicator device the fixed
+     ~34px safe-area reserve below (padding-bottom: var(--safe-bottom) on
+     .tabbar, not this) reads as an oddly tall dead strip when the icon row
+     above it is too short; this gives that row more visual weight so the
+     reserved strip looks proportionate rather than dominant. Not something
+     to fix by shrinking the safe-area reserve itself — that space is real,
+     needed so the home-indicator swipe gesture doesn't land on a tab. */
+  padding: 0.75rem 0.25rem;
   font-size: 0.68rem;
   color: var(--text-dim);
   font-weight: 600;

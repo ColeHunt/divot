@@ -6,7 +6,7 @@ import { totalStrokes, toPar } from '../../shared/src/scoring.js';
 import type { Course, CourseSummary, Hole, LastRound, SavedCourse } from '../../shared/src/types.js';
 
 export class CourseError extends Error {
-  constructor(readonly code: 'not_found' | 'bad_request', message: string) {
+  constructor(readonly code: 'not_found' | 'bad_request' | 'has_rounds', message: string) {
     super(message);
   }
 }
@@ -51,6 +51,18 @@ function sanitiseHoles(input: unknown): Hole[] {
   return holes.sort((a, b) => a.number - b.number);
 }
 
+function sanitiseName(name: unknown): string {
+  const cleanName = typeof name === 'string' ? name.trim().slice(0, MAX_NAME_LENGTH) : '';
+  if (!cleanName) throw new CourseError('bad_request', 'Enter a course name');
+  return cleanName;
+}
+
+function sanitiseLocation(location: unknown): string | null {
+  return typeof location === 'string' && location.trim()
+    ? location.trim().slice(0, MAX_LOCATION_LENGTH)
+    : null;
+}
+
 export function createCourse(
   createdBy: string,
   name: unknown,
@@ -58,14 +70,8 @@ export function createCourse(
   holesInput: unknown,
   now = Date.now(),
 ): Course {
-  const cleanName = typeof name === 'string' ? name.trim().slice(0, MAX_NAME_LENGTH) : '';
-  if (!cleanName) throw new CourseError('bad_request', 'Enter a course name');
-
-  const cleanLocation =
-    typeof location === 'string' && location.trim()
-      ? location.trim().slice(0, MAX_LOCATION_LENGTH)
-      : null;
-
+  const cleanName = sanitiseName(name);
+  const cleanLocation = sanitiseLocation(location);
   const holes = sanitiseHoles(holesInput);
   const id = generateId();
   const db = getDb();
@@ -121,6 +127,50 @@ export function getCourse(id: string): Course {
 
 export function courseExists(id: string): boolean {
   return Boolean(getDb().prepare('SELECT id FROM courses WHERE id = ?').get(id));
+}
+
+/** Admin-only (enforced by the route, not here) — replaces a course's name, location and full hole list. */
+export function updateCourse(id: string, name: unknown, location: unknown, holesInput: unknown): Course {
+  if (!courseExists(id)) throw new CourseError('not_found', 'No such course');
+
+  const cleanName = sanitiseName(name);
+  const cleanLocation = sanitiseLocation(location);
+  const holes = sanitiseHoles(holesInput);
+  const db = getDb();
+
+  db.transaction(() => {
+    db.prepare('UPDATE courses SET name = ?, location = ?, hole_count = ? WHERE id = ?').run(
+      cleanName,
+      cleanLocation,
+      holes.length,
+      id,
+    );
+    db.prepare('DELETE FROM course_holes WHERE course_id = ?').run(id);
+    const insertHole = db.prepare(
+      'INSERT INTO course_holes (course_id, hole_number, par, yardage) VALUES (?, ?, ?, ?)',
+    );
+    for (const hole of holes) insertHole.run(id, hole.number, hole.par, hole.yardage);
+  })();
+
+  return getCourse(id);
+}
+
+/**
+ * Admin-only (enforced by the route). Fails with 'has_rounds' rather than
+ * deleting anything if a round was ever played here — rounds.course_id is
+ * ON DELETE RESTRICT on purpose, so round history can never be silently
+ * destroyed by removing the course it was played on.
+ */
+export function deleteCourse(id: string): void {
+  if (!courseExists(id)) throw new CourseError('not_found', 'No such course');
+  try {
+    getDb().prepare('DELETE FROM courses WHERE id = ?').run(id);
+  } catch (error) {
+    if (error instanceof Error && /FOREIGN KEY constraint failed/i.test(error.message)) {
+      throw new CourseError('has_rounds', 'This course has rounds played on it and cannot be deleted');
+    }
+    throw error;
+  }
 }
 
 const MAX_SEARCH_RESULTS = 25;

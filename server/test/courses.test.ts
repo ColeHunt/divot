@@ -5,12 +5,14 @@ import { completeRound, createRound, setScore } from '../src/rounds.js';
 import {
   CourseError,
   createCourse,
+  deleteCourse,
   getLastRound,
   isSaved,
   listSavedCourses,
   saveCourse,
   searchCourses,
   unsaveCourse,
+  updateCourse,
 } from '../src/courses.js';
 
 let alice: string;
@@ -115,5 +117,52 @@ describe('getLastRound', () => {
     const last = getLastRound(alice, course.id);
     expect(last?.totalStrokes).toBe(9);
     expect(last?.scores).toEqual({ 1: 5, 2: 4 });
+  });
+});
+
+describe('updateCourse', () => {
+  it('replaces name, location and the full hole list', () => {
+    const course = createCourse(alice, 'Pebble Creek', 'CA', [{ number: 1, par: 4 }]);
+    const updated = updateCourse(course.id, 'Pebble Creek GC', 'Pebble Beach, CA', [
+      { number: 1, par: 5, yardage: 520 },
+      { number: 2, par: 3 },
+    ]);
+    expect(updated.name).toBe('Pebble Creek GC');
+    expect(updated.location).toBe('Pebble Beach, CA');
+    expect(updated.holeCount).toBe(2);
+    expect(updated.holes).toEqual([
+      { number: 1, par: 5, yardage: 520 },
+      { number: 2, par: 3, yardage: null },
+    ]);
+  });
+
+  it('rejects an unknown course', () => {
+    expect(() => updateCourse('nope', 'Name', null, [{ number: 1, par: 4 }])).toThrow(CourseError);
+  });
+
+  it('validates the same as creation', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [{ number: 1, par: 4 }]);
+    expect(() => updateCourse(course.id, '  ', null, [{ number: 1, par: 4 }])).toThrow(CourseError);
+    expect(() => updateCourse(course.id, 'Name', null, [])).toThrow(CourseError);
+  });
+});
+
+describe('deleteCourse', () => {
+  it('removes a course with no rounds played on it', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [{ number: 1, par: 4 }]);
+    deleteCourse(course.id);
+    expect(() => updateCourse(course.id, 'x', null, [{ number: 1, par: 4 }])).toThrow(CourseError);
+  });
+
+  it('refuses to delete a course with round history, without deleting anything', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [{ number: 1, par: 4 }]);
+    createRound(alice, { courseId: course.id });
+    expect(() => deleteCourse(course.id)).toThrow(CourseError);
+    // still there afterward — the attempt didn't partially apply
+    expect(() => updateCourse(course.id, 'still here', null, [{ number: 1, par: 4 }])).not.toThrow();
+  });
+
+  it('rejects an unknown course', () => {
+    expect(() => deleteCourse('nope')).toThrow(CourseError);
   });
 });
