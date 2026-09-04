@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { RoundTeam } from '@shared/types.js';
+import type { HoleHistory, RoundTeam } from '@shared/types.js';
 import { formatToPar, holesPlayed, scoreName, toPar, totalStrokes } from '@shared/scoring.js';
 import { Avatar } from '../components/Avatar.js';
 import { api, ApiError } from '../lib/api.js';
@@ -19,6 +19,23 @@ function scoreColor(diff: number): string {
   if (diff < 0) return 'var(--accent)';
   if (diff === 0) return 'var(--text-dim)';
   return 'var(--danger)';
+}
+
+/** One row of past strokes on a hole, e.g. "Your history" or "Scramble history". */
+function HistoryChips({ label, strokes, par }: { label: string; strokes: number[]; par: number }) {
+  if (strokes.length === 0) return null;
+  return (
+    <div style={{ marginTop: '0.7rem' }}>
+      <div className="tiny muted">{label}</div>
+      <div className="chip-row" style={{ marginTop: '0.4rem' }}>
+        {strokes.map((n, i) => (
+          <span key={i} className="badge badge-muted">
+            {n} · {scoreName(n - par)}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export function Round({ code }: { code: string }) {
@@ -44,7 +61,7 @@ export function Round({ code }: { code: string }) {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [pending, setPending] = useState(0);
-  const [holeHistory, setHoleHistory] = useState<Record<number, number[]>>({});
+  const [holeHistory, setHoleHistory] = useState<Record<number, HoleHistory>>({});
 
   const me = useMemo(() => round?.players.find((p) => p.userId === user?.id) ?? null, [round, user]);
   const myTeam = useMemo(
@@ -70,7 +87,7 @@ export function Round({ code }: { code: string }) {
 
   useEffect(() => {
     api
-      .get<{ history: Record<number, number[]> }>(`/api/rounds/${code}/hole-history`)
+      .get<{ history: Record<number, HoleHistory> }>(`/api/rounds/${code}/hole-history`)
       .then((res) => setHoleHistory(res.history))
       .catch(() => {});
   }, [code]);
@@ -323,18 +340,16 @@ export function Round({ code }: { code: string }) {
             </button>
           )}
 
-          {holeHistory[hole.number] != null && holeHistory[hole.number]!.length > 0 && (
-            <div style={{ marginTop: '1rem' }}>
-              <div className="tiny muted">Your history on this hole</div>
-              <div className="chip-row" style={{ marginTop: '0.4rem' }}>
-                {holeHistory[hole.number]!.map((strokes, i) => (
-                  <span key={i} className="badge badge-muted">
-                    {strokes} · {scoreName(strokes - hole.par)}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
+          <HistoryChips
+            label="Your history on this hole"
+            strokes={holeHistory[hole.number]?.personal ?? []}
+            par={hole.par}
+          />
+          <HistoryChips
+            label="Scramble history on this hole"
+            strokes={holeHistory[hole.number]?.scramble ?? []}
+            par={hole.par}
+          />
         </div>
       )}
 

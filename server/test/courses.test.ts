@@ -209,7 +209,10 @@ describe('getHoleHistory', () => {
     setScore(second.code, alice, 1, 4, 3000);
     completeRound(second.code, alice, 4000);
 
-    expect(getHoleHistory(alice, course.id)).toEqual({ 1: [4, 5], 2: [3] });
+    expect(getHoleHistory(alice, course.id)).toEqual({
+      1: { personal: [4, 5], scramble: [] },
+      2: { personal: [3], scramble: [] },
+    });
   });
 
   it('excludes the given round id, e.g. the one currently being played', () => {
@@ -222,7 +225,9 @@ describe('getHoleHistory', () => {
     const current = createRound(alice, { courseId: course.id }, 3000);
     setScore(current.code, alice, 1, 3, 3000);
 
-    expect(getHoleHistory(alice, course.id, current.id)).toEqual({ 1: [5] });
+    expect(getHoleHistory(alice, course.id, current.id)).toEqual({
+      1: { personal: [5], scramble: [] },
+    });
   });
 
   it('caps history per hole at 5 entries', () => {
@@ -232,7 +237,7 @@ describe('getHoleHistory', () => {
       setScore(round.code, alice, 1, 4, 1000 + i);
       completeRound(round.code, alice, 1000 + i);
     }
-    expect(getHoleHistory(alice, course.id)[1]).toHaveLength(5);
+    expect(getHoleHistory(alice, course.id)[1]!.personal).toHaveLength(5);
   });
 
   it('only counts completed rounds', () => {
@@ -242,17 +247,25 @@ describe('getHoleHistory', () => {
     expect(getHoleHistory(alice, course.id)).toEqual({});
   });
 
-  it('resolves through a team scorecard for a past scramble round', () => {
+  it('resolves through a team scorecard for a past scramble round, kept separate from personal history', () => {
     const course = createCourse(alice, 'Pebble Creek', null, [
       { number: 1, par: 4 },
       { number: 2, par: 3 },
     ]);
-    const { code } = createRound(alice, { courseId: course.id, format: 'scramble' });
-    setScore(code, alice, 1, 5);
-    setScore(code, alice, 2, 4);
-    completeRound(code, alice);
 
-    expect(getHoleHistory(alice, course.id)).toEqual({ 1: [5], 2: [4] });
+    const solo = createRound(alice, { courseId: course.id }, 1000);
+    setScore(solo.code, alice, 1, 6, 1000);
+    completeRound(solo.code, alice, 2000);
+
+    const scramble = createRound(alice, { courseId: course.id, format: 'scramble' }, 3000);
+    setScore(scramble.code, alice, 1, 5, 3000);
+    setScore(scramble.code, alice, 2, 4, 3000);
+    completeRound(scramble.code, alice, 4000);
+
+    expect(getHoleHistory(alice, course.id)).toEqual({
+      1: { personal: [6], scramble: [5] },
+      2: { personal: [], scramble: [4] },
+    });
   });
 });
 

@@ -65,6 +65,17 @@ export interface CourseStats {
   lastRound: LastRound | null;
 }
 
+/**
+ * A user's past strokes on one hole, split by the format they were earned
+ * under. A 'scramble' score is the whole team's shared shot, not this
+ * player's own play, so it's kept separate from genuinely personal
+ * 'stroke_play' history rather than blended into one misleading average.
+ */
+export interface HoleHistory {
+  personal: number[];
+  scramble: number[];
+}
+
 export type RoundStatus = 'active' | 'completed';
 export type RoundPlayerStatus = 'invited' | 'joined';
 export type RoundFormat = 'stroke_play' | 'scramble';

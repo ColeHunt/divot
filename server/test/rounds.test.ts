@@ -436,7 +436,9 @@ describe('getHoleHistoryForRound', () => {
     const current = startRound(alice);
     setScore(current.code, alice, 1, 3);
 
-    expect(getHoleHistoryForRound(current.code, alice)).toEqual({ 1: [5] });
+    expect(getHoleHistoryForRound(current.code, alice)).toEqual({
+      1: { personal: [5], scramble: [] },
+    });
   });
 
   it('rejects an unknown code', () => {

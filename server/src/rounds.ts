@@ -6,6 +6,7 @@ import { getUserById } from './users.js';
 import { isFriend } from './friends.js';
 import type {
   Course,
+  HoleHistory,
   RoundFormat,
   RoundInvite,
   RoundPlayer,
@@ -215,7 +216,7 @@ export function roundExists(code: string): boolean {
 }
 
 /** The caller's past strokes on each hole of this round's course, excluding this round itself. */
-export function getHoleHistoryForRound(code: string, userId: string): Record<number, number[]> {
+export function getHoleHistoryForRound(code: string, userId: string): Record<number, HoleHistory> {
   const round = loadRound(code);
   return getHoleHistory(userId, round.course_id, round.id);
 }

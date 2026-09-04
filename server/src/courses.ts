@@ -3,7 +3,15 @@ import { getDb } from './db.js';
 import { generateId } from './ids.js';
 import { scoresForRoundUser } from './scores.js';
 import { totalStrokes, toPar } from '../../shared/src/scoring.js';
-import type { Course, CourseStats, CourseSummary, Hole, LastRound, SavedCourse } from '../../shared/src/types.js';
+import type {
+  Course,
+  CourseStats,
+  CourseSummary,
+  Hole,
+  HoleHistory,
+  LastRound,
+  SavedCourse,
+} from '../../shared/src/types.js';
 
 export class CourseError extends Error {
   constructor(readonly code: 'not_found' | 'bad_request' | 'has_rounds', message: string) {
@@ -338,16 +346,20 @@ const MAX_HISTORY_PER_HOLE = 5;
  * and capped per hole — a quick "how have I done here before" while scoring
  * that hole live. `excludeRoundId` leaves out the round being played right
  * now, so it never shows a score back to the person who just entered it.
+ *
+ * Split into `personal` (stroke_play — genuinely their own play) and
+ * `scramble` (a shared team result) buckets, each capped independently, so
+ * a team's best-ball score never gets averaged in with the player's own.
  */
 export function getHoleHistory(
   userId: string,
   courseId: string,
   excludeRoundId?: string,
-): Record<number, number[]> {
+): Record<number, HoleHistory> {
   const db = getDb();
   const rounds = db
     .prepare(
-      `SELECT r.id, r.completed_at
+      `SELECT r.id, r.format, r.completed_at
        FROM rounds r
        JOIN round_players p ON p.round_id = r.id
        WHERE r.course_id = ? AND p.user_id = ? AND r.status = 'completed' AND r.id != ?
@@ -355,16 +367,18 @@ export function getHoleHistory(
     )
     .all(courseId, userId, excludeRoundId ?? '', MAX_ROUNDS_FOR_HOLE_HISTORY) as Array<{
     id: string;
+    format: string;
     completed_at: number;
   }>;
 
-  const history: Record<number, number[]> = {};
+  const history: Record<number, HoleHistory> = {};
   for (const round of rounds) {
     const scores = scoresForRoundUser(round.id, userId);
+    const bucket = round.format === 'scramble' ? 'scramble' : 'personal';
     for (const [holeNumberStr, strokes] of Object.entries(scores)) {
       const holeNumber = Number(holeNumberStr);
-      const forHole = (history[holeNumber] ??= []);
-      if (forHole.length < MAX_HISTORY_PER_HOLE) forHole.push(strokes);
+      const forHole = (history[holeNumber] ??= { personal: [], scramble: [] });
+      if (forHole[bucket].length < MAX_HISTORY_PER_HOLE) forHole[bucket].push(strokes);
     }
   }
   return history;
