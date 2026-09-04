@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Course, CourseStats as CourseStatsData } from '@shared/types.js';
+import type { Course, CourseStats as CourseStatsData, Hole } from '@shared/types.js';
 import { formatToPar } from '@shared/scoring.js';
 import { LineChart, type ChartSeries } from '../components/LineChart.js';
 import { api } from '../lib/api.js';
@@ -8,6 +8,33 @@ import { navigate } from '../lib/router.js';
 const BEST_COLOR = '#47c98a';
 const LAST_COLOR = '#f2b134';
 const PAR_COLOR = '#6b7d72';
+
+/**
+ * Running total through each hole — strokes if `useToPar` is false, strokes
+ * minus par (how far over/under) if true. A hole with no score (not part of
+ * this round's selection, e.g. a front-9 round) leaves a gap rather than
+ * resetting the total, so the line picks back up from wherever it left off.
+ */
+function cumulative(holes: Hole[], scores: Record<number, number>, useToPar: boolean): (number | null)[] {
+  let sum = 0;
+  let any = false;
+  return holes.map((h) => {
+    const strokes = scores[h.number];
+    if (strokes == null) return any ? sum : null;
+    any = true;
+    sum += useToPar ? strokes - h.par : strokes;
+    return sum;
+  });
+}
+
+/** The running "even par" pace line — cumulative par through each hole, regardless of what was actually played. */
+function cumulativePar(holes: Hole[]): number[] {
+  let sum = 0;
+  return holes.map((h) => {
+    sum += h.par;
+    return sum;
+  });
+}
 
 function Legend({ series }: { series: ChartSeries[] }) {
   return (
@@ -61,12 +88,8 @@ export function CourseStats({ id }: { id: string }) {
   const toParSeries: ChartSeries[] = [];
 
   function addRoundSeries(label: string, color: string, scores: Record<number, number>) {
-    strokesSeries.push({ label, color, values: holes.map((h) => scores[h.number] ?? null) });
-    toParSeries.push({
-      label,
-      color,
-      values: holes.map((h) => (scores[h.number] != null ? scores[h.number]! - h.par : null)),
-    });
+    strokesSeries.push({ label, color, values: cumulative(holes, scores, false) });
+    toParSeries.push({ label, color, values: cumulative(holes, scores, true) });
   }
 
   if (sameRound) {
@@ -76,7 +99,7 @@ export function CourseStats({ id }: { id: string }) {
     if (stats.lastRound) addRoundSeries('Last round', LAST_COLOR, stats.lastRound.scores);
   }
   if (strokesSeries.length > 0) {
-    strokesSeries.push({ label: 'Par', color: PAR_COLOR, dashed: true, values: holes.map((h) => h.par) });
+    strokesSeries.push({ label: 'Par pace', color: PAR_COLOR, dashed: true, values: cumulativePar(holes) });
   }
 
   return (
@@ -128,13 +151,13 @@ export function CourseStats({ id }: { id: string }) {
           </div>
 
           <div className="card">
-            <h2>Strokes per hole</h2>
+            <h2>Cumulative strokes</h2>
             <LineChart categories={categories} series={strokesSeries} />
             <Legend series={strokesSeries} />
           </div>
 
           <div className="card">
-            <h2>Score to par per hole</h2>
+            <h2>Cumulative score to par</h2>
             <LineChart categories={categories} series={toParSeries} zeroLine />
             <Legend series={toParSeries} />
           </div>
