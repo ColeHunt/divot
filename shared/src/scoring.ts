@@ -34,3 +34,25 @@ export function formatToPar(diff: number): string {
 export function coursePar(holes: Hole[]): number {
   return holes.reduce((sum, hole) => sum + hole.par, 0);
 }
+
+/** The traditional golf name for a score, by strokes relative to par on that hole. */
+export function scoreName(diff: number): string {
+  switch (diff) {
+    case -3:
+      return 'Albatross';
+    case -2:
+      return 'Eagle';
+    case -1:
+      return 'Birdie';
+    case 0:
+      return 'Par';
+    case 1:
+      return 'Bogey';
+    case 2:
+      return 'Double Bogey';
+    case 3:
+      return 'Triple Bogey';
+    default:
+      return diff < -3 ? `${-diff} Under` : `${diff} Over`;
+  }
+}

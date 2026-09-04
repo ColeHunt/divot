@@ -1,7 +1,7 @@
 import { config } from './config.js';
 import { getDb } from './db.js';
 import { generateId, generateRoundCode } from './ids.js';
-import { courseExists, getCourse } from './courses.js';
+import { courseExists, getCourse, getHoleHistory } from './courses.js';
 import { getUserById } from './users.js';
 import { isFriend } from './friends.js';
 import type {
@@ -212,6 +212,12 @@ function loadRound(code: string): RoundRow {
 
 export function roundExists(code: string): boolean {
   return Boolean(getDb().prepare('SELECT id FROM rounds WHERE code = ?').get(code));
+}
+
+/** The caller's past strokes on each hole of this round's course, excluding this round itself. */
+export function getHoleHistoryForRound(code: string, userId: string): Record<number, number[]> {
+  const round = loadRound(code);
+  return getHoleHistory(userId, round.course_id, round.id);
 }
 
 interface PlayerRow {

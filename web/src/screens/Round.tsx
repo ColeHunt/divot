@@ -1,19 +1,24 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { RoundTeam } from '@shared/types.js';
-import { formatToPar, holesPlayed, toPar, totalStrokes } from '@shared/scoring.js';
+import { formatToPar, holesPlayed, scoreName, toPar, totalStrokes } from '@shared/scoring.js';
 import { Avatar } from '../components/Avatar.js';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
 import { useRound } from '../lib/useRound.js';
 import { navigate } from '../lib/router.js';
 
-function strokeOptions(par: number): number[] {
-  const start = Math.max(1, par - 2);
-  return Array.from({ length: 6 }, (_, i) => start + i);
-}
+const MIN_STROKES = 1;
+const MAX_STROKES = 20;
 
 function initials(name: string): string {
   return name[0]?.toUpperCase() ?? '?';
+}
+
+/** Green for under par, dim for even, red for over — matches the badge colors used elsewhere. */
+function scoreColor(diff: number): string {
+  if (diff < 0) return 'var(--accent)';
+  if (diff === 0) return 'var(--text-dim)';
+  return 'var(--danger)';
 }
 
 export function Round({ code }: { code: string }) {
@@ -38,12 +43,37 @@ export function Round({ code }: { code: string }) {
   const [teamNameDraft, setTeamNameDraft] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [pending, setPending] = useState(0);
+  const [holeHistory, setHoleHistory] = useState<Record<number, number[]>>({});
 
   const me = useMemo(() => round?.players.find((p) => p.userId === user?.id) ?? null, [round, user]);
   const myTeam = useMemo(
     () => round?.teams.find((t) => user && t.memberUserIds.includes(user.id)) ?? null,
     [round, user],
   );
+
+  const isScramble = round?.format === 'scramble';
+  const hole = round?.course.holes[holeIndex];
+  const myScores = (isScramble ? myTeam?.scores : me?.scores) ?? {};
+
+  // Re-baseline the stepper when navigating to a different hole, or when the
+  // *committed* score for the hole being viewed changes — our own save
+  // confirming over the websocket, or (in scramble) a teammate scoring the
+  // same shared hole. An in-progress adjustment on this hole is otherwise
+  // left alone, so it doesn't jump around mid-edit.
+  const committedForHole = hole ? myScores[hole.number] : undefined;
+  useEffect(() => {
+    if (!hole) return;
+    setPending(committedForHole ?? hole.par);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hole?.number, committedForHole]);
+
+  useEffect(() => {
+    api
+      .get<{ history: Record<number, number[]> }>(`/api/rounds/${code}/hole-history`)
+      .then((res) => setHoleHistory(res.history))
+      .catch(() => {});
+  }, [code]);
 
   if (fatalError) {
     return (
@@ -68,9 +98,6 @@ export function Round({ code }: { code: string }) {
     );
   }
 
-  const isScramble = round.format === 'scramble';
-  const hole = round.course.holes[holeIndex];
-  const myScores = (isScramble ? myTeam?.scores : me?.scores) ?? {};
   const isComplete = round.status === 'completed';
   const canScore = isScramble ? Boolean(myTeam) : Boolean(me);
   const isCreator = user?.id === round.createdBy;
@@ -248,24 +275,66 @@ export function Round({ code }: { code: string }) {
             </button>
           </div>
 
-          <div className="stroke-grid">
-            {strokeOptions(hole.par).map((n) => (
-              <button
-                key={n}
-                className="stroke-btn"
-                aria-pressed={myScores[hole.number] === n}
-                onClick={() => {
-                  const next = myScores[hole.number] === n ? null : n;
-                  setScore(hole.number, next);
-                  if (next != null && holeIndex < round.course.holes.length - 1) {
-                    setHoleIndex((i) => i + 1);
-                  }
-                }}
-              >
-                {n}
-              </button>
-            ))}
+          <div className="score-stepper">
+            <button
+              className="stepper-btn"
+              aria-label="Decrease strokes"
+              onClick={() => setPending((p) => Math.max(MIN_STROKES, p - 1))}
+              disabled={pending <= MIN_STROKES}
+            >
+              −
+            </button>
+            <div className="stepper-value">
+              <div className="stepper-number">{pending}</div>
+              <div className="stepper-label" style={{ color: scoreColor(pending - hole.par) }}>
+                {scoreName(pending - hole.par)}
+              </div>
+            </div>
+            <button
+              className="stepper-btn"
+              aria-label="Increase strokes"
+              onClick={() => setPending((p) => Math.min(MAX_STROKES, p + 1))}
+              disabled={pending >= MAX_STROKES}
+            >
+              +
+            </button>
           </div>
+
+          <button
+            className="btn btn-primary btn-full"
+            onClick={() => {
+              setScore(hole.number, pending);
+              if (holeIndex < round.course.holes.length - 1) setHoleIndex((i) => i + 1);
+            }}
+          >
+            Save score
+          </button>
+
+          {myScores[hole.number] != null && (
+            <button
+              className="btn-ghost tiny"
+              style={{ display: 'block', margin: '0.6rem auto 0', padding: 0, minHeight: 0 }}
+              onClick={() => {
+                setScore(hole.number, null);
+                setPending(hole.par);
+              }}
+            >
+              Clear score
+            </button>
+          )}
+
+          {holeHistory[hole.number] != null && holeHistory[hole.number]!.length > 0 && (
+            <div style={{ marginTop: '1rem' }}>
+              <div className="tiny muted">Your history on this hole</div>
+              <div className="chip-row" style={{ marginTop: '0.4rem' }}>
+                {holeHistory[hole.number]!.map((strokes, i) => (
+                  <span key={i} className="badge badge-muted">
+                    {strokes} · {scoreName(strokes - hole.par)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

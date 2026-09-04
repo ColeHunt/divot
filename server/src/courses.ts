@@ -329,3 +329,43 @@ export function getCourseStats(userId: string, courseId: string): CourseStats {
 
   return { roundsPlayed: stats.length, bestRound, lastRound };
 }
+
+const MAX_ROUNDS_FOR_HOLE_HISTORY = 20;
+const MAX_HISTORY_PER_HOLE = 5;
+
+/**
+ * A user's past strokes on each hole of a course, most recent round first
+ * and capped per hole — a quick "how have I done here before" while scoring
+ * that hole live. `excludeRoundId` leaves out the round being played right
+ * now, so it never shows a score back to the person who just entered it.
+ */
+export function getHoleHistory(
+  userId: string,
+  courseId: string,
+  excludeRoundId?: string,
+): Record<number, number[]> {
+  const db = getDb();
+  const rounds = db
+    .prepare(
+      `SELECT r.id, r.completed_at
+       FROM rounds r
+       JOIN round_players p ON p.round_id = r.id
+       WHERE r.course_id = ? AND p.user_id = ? AND r.status = 'completed' AND r.id != ?
+       ORDER BY r.completed_at DESC LIMIT ?`,
+    )
+    .all(courseId, userId, excludeRoundId ?? '', MAX_ROUNDS_FOR_HOLE_HISTORY) as Array<{
+    id: string;
+    completed_at: number;
+  }>;
+
+  const history: Record<number, number[]> = {};
+  for (const round of rounds) {
+    const scores = scoresForRoundUser(round.id, userId);
+    for (const [holeNumberStr, strokes] of Object.entries(scores)) {
+      const holeNumber = Number(holeNumberStr);
+      const forHole = (history[holeNumber] ??= []);
+      if (forHole.length < MAX_HISTORY_PER_HOLE) forHole.push(strokes);
+    }
+  }
+  return history;
+}

@@ -51,6 +51,7 @@ import {
   createRound,
   declineRound,
   deleteRound,
+  getHoleHistoryForRound,
   getRoundState,
   joinRound,
   listMyInvites,
@@ -450,6 +451,15 @@ export function createApp(): express.Express {
       return;
     }
     res.json({ round: getRoundState(code) });
+  });
+
+  api.get('/rounds/:code/hole-history', (req: AuthedRequest, res) => {
+    const code = normaliseRoundCode(req.params.code ?? '');
+    if (!isValidRoundCode(code) || !roundExists(code)) {
+      res.status(404).json({ error: 'round_not_found' });
+      return;
+    }
+    res.json({ history: getHoleHistoryForRound(code, req.userId!) });
   });
 
   api.post('/rounds/:code/join', (req: AuthedRequest, res) => {

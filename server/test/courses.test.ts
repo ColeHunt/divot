@@ -7,6 +7,7 @@ import {
   createCourse,
   deleteCourse,
   getCourseStats,
+  getHoleHistory,
   getLastRound,
   isSaved,
   listSavedCourses,
@@ -181,6 +182,64 @@ describe('getCourseStats', () => {
     const { code } = createRound(alice, { courseId: course.id });
     setScore(code, alice, 1, 4);
     expect(getCourseStats(alice, course.id)).toEqual({ roundsPlayed: 0, bestRound: null, lastRound: null });
+  });
+});
+
+describe('getHoleHistory', () => {
+  it('is empty with no completed rounds', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [
+      { number: 1, par: 4 },
+      { number: 2, par: 3 },
+    ]);
+    expect(getHoleHistory(alice, course.id)).toEqual({});
+  });
+
+  it('collects past strokes per hole, most recent round first', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [
+      { number: 1, par: 4 },
+      { number: 2, par: 3 },
+    ]);
+
+    const first = createRound(alice, { courseId: course.id }, 1000);
+    setScore(first.code, alice, 1, 5, 1000);
+    setScore(first.code, alice, 2, 3, 1000);
+    completeRound(first.code, alice, 2000);
+
+    const second = createRound(alice, { courseId: course.id }, 3000);
+    setScore(second.code, alice, 1, 4, 3000);
+    completeRound(second.code, alice, 4000);
+
+    expect(getHoleHistory(alice, course.id)).toEqual({ 1: [4, 5], 2: [3] });
+  });
+
+  it('excludes the given round id, e.g. the one currently being played', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [{ number: 1, par: 4 }]);
+
+    const past = createRound(alice, { courseId: course.id }, 1000);
+    setScore(past.code, alice, 1, 5, 1000);
+    completeRound(past.code, alice, 2000);
+
+    const current = createRound(alice, { courseId: course.id }, 3000);
+    setScore(current.code, alice, 1, 3, 3000);
+
+    expect(getHoleHistory(alice, course.id, current.id)).toEqual({ 1: [5] });
+  });
+
+  it('caps history per hole at 5 entries', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [{ number: 1, par: 4 }]);
+    for (let i = 0; i < 7; i += 1) {
+      const round = createRound(alice, { courseId: course.id }, 1000 + i);
+      setScore(round.code, alice, 1, 4, 1000 + i);
+      completeRound(round.code, alice, 1000 + i);
+    }
+    expect(getHoleHistory(alice, course.id)[1]).toHaveLength(5);
+  });
+
+  it('only counts completed rounds', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [{ number: 1, par: 4 }]);
+    const { code } = createRound(alice, { courseId: course.id });
+    setScore(code, alice, 1, 4);
+    expect(getHoleHistory(alice, course.id)).toEqual({});
   });
 });
 

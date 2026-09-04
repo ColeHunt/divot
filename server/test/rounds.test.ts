@@ -10,6 +10,7 @@ import {
   createTeam,
   declineRound,
   deleteRound,
+  getHoleHistoryForRound,
   getRoundState,
   joinRound,
   joinTeam,
@@ -423,5 +424,22 @@ describe('deleteRound', () => {
     deleteRound(code, alice);
     const mine = listMyRounds(alice);
     expect(mine.active.some((r) => r.code === code)).toBe(false);
+  });
+});
+
+describe('getHoleHistoryForRound', () => {
+  it('shows past strokes on this course, excluding the round being played now', () => {
+    const past = startRound(alice);
+    setScore(past.code, alice, 1, 5);
+    completeRound(past.code, alice);
+
+    const current = startRound(alice);
+    setScore(current.code, alice, 1, 3);
+
+    expect(getHoleHistoryForRound(current.code, alice)).toEqual({ 1: [5] });
+  });
+
+  it('rejects an unknown code', () => {
+    expect(() => getHoleHistoryForRound('ZZZZZZ', alice)).toThrow(RoundError);
   });
 });
