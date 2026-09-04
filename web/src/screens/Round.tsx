@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { RoundTeam } from '@shared/types.js';
 import { formatToPar, holesPlayed, toPar, totalStrokes } from '@shared/scoring.js';
 import { Avatar } from '../components/Avatar.js';
+import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
 import { useRound } from '../lib/useRound.js';
 import { navigate } from '../lib/router.js';
@@ -35,6 +36,8 @@ export function Round({ code }: { code: string }) {
   const [newTeamName, setNewTeamName] = useState('');
   const [renaming, setRenaming] = useState(false);
   const [teamNameDraft, setTeamNameDraft] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const me = useMemo(() => round?.players.find((p) => p.userId === user?.id) ?? null, [round, user]);
   const myTeam = useMemo(
@@ -70,6 +73,7 @@ export function Round({ code }: { code: string }) {
   const myScores = (isScramble ? myTeam?.scores : me?.scores) ?? {};
   const isComplete = round.status === 'completed';
   const canScore = isScramble ? Boolean(myTeam) : Boolean(me);
+  const isCreator = user?.id === round.createdBy;
 
   function share() {
     const url = `${location.origin}/round/${code}`;
@@ -81,6 +85,19 @@ export function Round({ code }: { code: string }) {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     });
+  }
+
+  async function removeRound() {
+    if (!window.confirm('Delete this round? This cannot be undone.')) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await api.delete(`/api/rounds/${code}`);
+      navigate('/');
+    } catch (err) {
+      setDeleteError(err instanceof ApiError ? err.message : 'Could not delete this round');
+      setDeleting(false);
+    }
   }
 
   function nameFor(userId: string): string {
@@ -318,8 +335,17 @@ export function Round({ code }: { code: string }) {
         )}
       </div>
 
+      {isCreator && (
+        <div className="card">
+          <button className="btn btn-full btn-ghost btn-danger" onClick={removeRound} disabled={deleting}>
+            Delete round
+          </button>
+        </div>
+      )}
+
       {copied && <div className="toast">Link copied</div>}
       {error && <div className="toast">{error}</div>}
+      {deleteError && <div className="toast">{deleteError}</div>}
     </div>
   );
 }

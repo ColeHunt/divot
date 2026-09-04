@@ -472,6 +472,19 @@ export function reopenRound(code: string, userId: string, now = Date.now()): voi
   touch(round.id);
 }
 
+/**
+ * Permanently deletes a round — only its creator can. Every dependent row
+ * (players, scores, teams, round_holes) cascades off rounds.id, so this is
+ * the one place a round's data actually goes away.
+ */
+export function deleteRound(code: string, userId: string): void {
+  const round = loadRound(code);
+  if (round.created_by !== userId) {
+    throw new RoundError('not_your_round', 'Only the round creator can delete it');
+  }
+  getDb().prepare('DELETE FROM rounds WHERE id = ?').run(round.id);
+}
+
 function teamsForRound(roundId: string): RoundTeam[] {
   const db = getDb();
   const teamRows = db

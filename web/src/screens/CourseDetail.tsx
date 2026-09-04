@@ -86,6 +86,9 @@ export function CourseDetail({ id }: { id: string }) {
         <button className="btn btn-primary btn-full" onClick={() => navigate(`/round/new?course=${course.id}`)}>
           Start a round here
         </button>
+        <button className="btn btn-full" onClick={() => navigate(`/courses/${course.id}/stats`)}>
+          View stats
+        </button>
         <button className="btn btn-full" onClick={toggleSave} disabled={busy}>
           {data.saved ? 'Remove from your courses' : 'Save to your courses'}
         </button>

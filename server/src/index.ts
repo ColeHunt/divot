@@ -20,7 +20,7 @@ import { checkRateLimit, clearRateLimit } from './rateLimit.js';
 import { confirmPasswordReset, requestPasswordReset } from './passwordReset.js';
 import { AvatarError, getAvatar, removeAvatar, setAvatar } from './avatars.js';
 import { isAdmin } from './admins.js';
-import { attachHub, broadcastRound } from './hub.js';
+import { attachHub, broadcastRound, notifyRoundDeleted } from './hub.js';
 import {
   FriendError,
   acceptFriendRequest,
@@ -35,6 +35,7 @@ import {
   createCourse,
   deleteCourse,
   getCourse,
+  getCourseStats,
   getLastRound,
   isSaved,
   listSavedCourses,
@@ -49,6 +50,7 @@ import {
   completeRound,
   createRound,
   declineRound,
+  deleteRound,
   getRoundState,
   joinRound,
   listMyInvites,
@@ -90,6 +92,8 @@ function errorStatus(code: string): number {
     case 'bad_credentials':
     case 'invalid_reset_token':
       return 401;
+    case 'not_your_round':
+      return 403;
     case 'rate_limited':
       return 429;
     default:
@@ -359,6 +363,19 @@ export function createApp(): express.Express {
     }
   });
 
+  api.get('/courses/:id/stats', (req: AuthedRequest, res) => {
+    try {
+      getCourse(req.params.id!);
+      res.json(getCourseStats(req.userId!, req.params.id!));
+    } catch (error) {
+      if (error instanceof CourseError) {
+        res.status(errorStatus(error.code)).json({ error: error.code, message: error.message });
+        return;
+      }
+      throw error;
+    }
+  });
+
   api.patch('/courses/:id', requireAdmin, (req: AuthedRequest, res) => {
     try {
       const course = updateCourse(req.params.id!, req.body?.name, req.body?.location, req.body?.holes);
@@ -462,6 +479,21 @@ export function createApp(): express.Express {
       completeRound(code, req.userId!);
       broadcastRound(code);
       res.json({ round: getRoundState(code) });
+    } catch (error) {
+      if (error instanceof RoundError) {
+        res.status(errorStatus(error.code)).json({ error: error.code, message: error.message });
+        return;
+      }
+      throw error;
+    }
+  });
+
+  api.delete('/rounds/:code', (req: AuthedRequest, res) => {
+    try {
+      const code = normaliseRoundCode(req.params.code ?? '');
+      deleteRound(code, req.userId!);
+      notifyRoundDeleted(code);
+      res.json({ ok: true });
     } catch (error) {
       if (error instanceof RoundError) {
         res.status(errorStatus(error.code)).json({ error: error.code, message: error.message });

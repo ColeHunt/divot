@@ -531,3 +531,54 @@ button:focus-visible {
     transform: none;
   }
 }
+
+.line-chart {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.chart-gridline {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.chart-zero-line {
+  stroke: var(--text-dim);
+  stroke-width: 1;
+  stroke-dasharray: 2, 3;
+}
+
+.chart-axis-label {
+  fill: var(--text-dim);
+  font-size: 9px;
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+  margin-top: 0.6rem;
+}
+
+.chart-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+.chart-legend-swatch {
+  width: 14px;
+  height: 0;
+  border-top-width: 3px;
+  border-top-style: solid;
+  flex-shrink: 0;
+}
+
+.stat-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}

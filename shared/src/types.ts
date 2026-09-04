@@ -48,7 +48,7 @@ export interface SavedCourse extends CourseSummary {
   lastPlayed: LastRound | null;
 }
 
-/** One player's completed round on a course, used to show "last time here". */
+/** One player's completed round on a course, used to show "last time here" or a stats comparison line. */
 export interface LastRound {
   roundId: string;
   code: string;
@@ -56,6 +56,13 @@ export interface LastRound {
   totalStrokes: number;
   toPar: number;
   scores: Record<number, number>;
+}
+
+/** A user's stats on one course: their lowest-scoring and most recent completed rounds there. */
+export interface CourseStats {
+  roundsPlayed: number;
+  bestRound: LastRound | null;
+  lastRound: LastRound | null;
 }
 
 export type RoundStatus = 'active' | 'completed';

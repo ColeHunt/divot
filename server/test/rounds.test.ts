@@ -9,6 +9,7 @@ import {
   createRound,
   createTeam,
   declineRound,
+  deleteRound,
   getRoundState,
   joinRound,
   joinTeam,
@@ -17,6 +18,7 @@ import {
   listMyRounds,
   renameTeam,
   reopenRound,
+  roundExists,
   setScore,
 } from '../src/rounds.js';
 import { isValidRoundCode } from '../src/ids.js';
@@ -385,5 +387,41 @@ describe('holes selection (front9 / back9 / full)', () => {
     expect(state.course.holeCount).toBe(18);
     expect(state.holesLabel).toBeNull();
     expect(() => setScore(code, alice, 15, 4)).not.toThrow();
+  });
+});
+
+describe('deleteRound', () => {
+  it('lets the creator delete their round', () => {
+    const { code } = startRound(alice);
+    deleteRound(code, alice);
+    expect(roundExists(code)).toBe(false);
+  });
+
+  it('refuses a non-creator, even a joined player', () => {
+    const { code } = startRound(alice, { inviteFriendIds: [bob] });
+    joinRound(code, bob);
+    expect(() => deleteRound(code, bob)).toThrow(RoundError);
+    expect(roundExists(code)).toBe(true);
+  });
+
+  it('rejects an unknown code', () => {
+    expect(() => deleteRound('ZZZZZZ', alice)).toThrow(RoundError);
+  });
+
+  it('cascades scores, players and teams cleanly for a scored scramble round', () => {
+    const { code } = startRound(alice, { inviteFriendIds: [bob], format: 'scramble' });
+    joinRound(code, bob);
+    setScore(code, alice, 1, 4);
+    createTeam(code, bob, 'Bravo');
+    setScore(code, bob, 2, 3);
+    expect(() => deleteRound(code, alice)).not.toThrow();
+    expect(roundExists(code)).toBe(false);
+  });
+
+  it('removes the round from listMyRounds', () => {
+    const { code } = startRound(alice);
+    deleteRound(code, alice);
+    const mine = listMyRounds(alice);
+    expect(mine.active.some((r) => r.code === code)).toBe(false);
   });
 });

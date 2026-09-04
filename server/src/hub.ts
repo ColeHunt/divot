@@ -57,6 +57,20 @@ export function broadcastRound(code: string): void {
   }
 }
 
+/**
+ * Tells every session currently subscribed to `code` that the round is gone
+ * — the same 'round_not_found' error they'd get subscribing fresh, which the
+ * client already treats as fatal. Called right after a successful delete, so
+ * no one is left polling a round that no longer exists.
+ */
+export function notifyRoundDeleted(code: string): void {
+  for (const session of sessions.values()) {
+    if (session.roundCode !== code) continue;
+    session.roundCode = null;
+    sendError(session.socket, 'round_not_found', 'This round was deleted');
+  }
+}
+
 function withinRateLimit(session: Session, now: number): boolean {
   if (now - session.windowStart >= 60_000) {
     session.windowStart = now;

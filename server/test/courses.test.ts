@@ -6,6 +6,7 @@ import {
   CourseError,
   createCourse,
   deleteCourse,
+  getCourseStats,
   getLastRound,
   isSaved,
   listSavedCourses,
@@ -117,6 +118,69 @@ describe('getLastRound', () => {
     const last = getLastRound(alice, course.id);
     expect(last?.totalStrokes).toBe(9);
     expect(last?.scores).toEqual({ 1: 5, 2: 4 });
+  });
+});
+
+describe('getCourseStats', () => {
+  it('is all nulls with zero rounds played', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [{ number: 1, par: 4 }]);
+    expect(getCourseStats(alice, course.id)).toEqual({ roundsPlayed: 0, bestRound: null, lastRound: null });
+  });
+
+  it('reports the same round as both best and last when there is only one', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [
+      { number: 1, par: 4 },
+      { number: 2, par: 3 },
+    ]);
+    const { code } = createRound(alice, { courseId: course.id });
+    setScore(code, alice, 1, 5);
+    setScore(code, alice, 2, 4);
+    completeRound(code, alice);
+
+    const stats = getCourseStats(alice, course.id);
+    expect(stats.roundsPlayed).toBe(1);
+    expect(stats.bestRound?.code).toBe(code);
+    expect(stats.lastRound?.code).toBe(code);
+    expect(stats.bestRound?.totalStrokes).toBe(9);
+  });
+
+  it('picks the lowest-scoring round as best even when it is not the most recent', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [{ number: 1, par: 4 }]);
+
+    const great = createRound(alice, { courseId: course.id }, 1000);
+    setScore(great.code, alice, 1, 3, 1000);
+    completeRound(great.code, alice, 2000);
+
+    const mediocre = createRound(alice, { courseId: course.id }, 3000);
+    setScore(mediocre.code, alice, 1, 6, 3000);
+    completeRound(mediocre.code, alice, 4000);
+
+    const stats = getCourseStats(alice, course.id);
+    expect(stats.roundsPlayed).toBe(2);
+    expect(stats.bestRound?.code).toBe(great.code);
+    expect(stats.lastRound?.code).toBe(mediocre.code);
+  });
+
+  it('excludes an unscored round from "best" but still surfaces it as "last"', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [{ number: 1, par: 4 }]);
+
+    const scored = createRound(alice, { courseId: course.id }, 1000);
+    setScore(scored.code, alice, 1, 5, 1000);
+    completeRound(scored.code, alice, 2000);
+
+    const blank = createRound(alice, { courseId: course.id }, 3000);
+    completeRound(blank.code, alice, 4000);
+
+    const stats = getCourseStats(alice, course.id);
+    expect(stats.bestRound?.code).toBe(scored.code);
+    expect(stats.lastRound?.code).toBe(blank.code);
+  });
+
+  it('only counts completed rounds', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [{ number: 1, par: 4 }]);
+    const { code } = createRound(alice, { courseId: course.id });
+    setScore(code, alice, 1, 4);
+    expect(getCourseStats(alice, course.id)).toEqual({ roundsPlayed: 0, bestRound: null, lastRound: null });
   });
 });
 

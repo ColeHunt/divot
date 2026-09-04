@@ -3,7 +3,7 @@ import { getDb } from './db.js';
 import { generateId } from './ids.js';
 import { scoresForRoundUser } from './scores.js';
 import { totalStrokes, toPar } from '../../shared/src/scoring.js';
-import type { Course, CourseSummary, Hole, LastRound, SavedCourse } from '../../shared/src/types.js';
+import type { Course, CourseStats, CourseSummary, Hole, LastRound, SavedCourse } from '../../shared/src/types.js';
 
 export class CourseError extends Error {
   constructor(readonly code: 'not_found' | 'bad_request' | 'has_rounds', message: string) {
@@ -286,4 +286,46 @@ export function getLastRound(userId: string, courseId: string): LastRound | null
     toPar: toPar(scores, holes),
     scores,
   };
+}
+
+/**
+ * Every one of a user's completed rounds on a course, reduced to their best
+ * (lowest total strokes, ties broken toward the more recent one — 'reduce'
+ * only replaces on a strict improvement) and most recent. A round with no
+ * strokes entered at all can't be anyone's "best", so it's excluded from
+ * that half only; the most recent round still surfaces even if unscored.
+ */
+export function getCourseStats(userId: string, courseId: string): CourseStats {
+  const db = getDb();
+  const rounds = db
+    .prepare(
+      `SELECT r.id, r.code, r.completed_at
+       FROM rounds r
+       JOIN round_players p ON p.round_id = r.id
+       WHERE r.course_id = ? AND p.user_id = ? AND r.status = 'completed'
+       ORDER BY r.completed_at DESC`,
+    )
+    .all(courseId, userId) as RoundRow[];
+
+  if (rounds.length === 0) return { roundsPlayed: 0, bestRound: null, lastRound: null };
+
+  const holes = holesFor(courseId);
+  const stats: LastRound[] = rounds.map((round) => {
+    const scores = scoresForRoundUser(round.id, userId);
+    return {
+      roundId: round.id,
+      code: round.code,
+      playedAt: round.completed_at,
+      totalStrokes: totalStrokes(scores),
+      toPar: toPar(scores, holes),
+      scores,
+    };
+  });
+
+  const lastRound = stats[0]!;
+  const bestRound = stats
+    .filter((s) => Object.keys(s.scores).length > 0)
+    .reduce<LastRound | null>((best, s) => (!best || s.totalStrokes < best.totalStrokes ? s : best), null);
+
+  return { roundsPlayed: stats.length, bestRound, lastRound };
 }
