@@ -144,6 +144,18 @@ function migrate(instance: Db): void {
 
     CREATE INDEX IF NOT EXISTS idx_rounds_course ON rounds(course_id);
 
+    -- The holes actually being played in a round — e.g. just the front 9 of
+    -- an 18-hole course. One row per hole, snapshotted at creation so a
+    -- later edit to the course's own holes never reshapes a round already
+    -- in progress or in the history books. A round with no rows here (any
+    -- round created before this table existed) falls back to every hole on
+    -- the course, which is exactly what it did before this feature shipped.
+    CREATE TABLE IF NOT EXISTS round_holes (
+      round_id    TEXT NOT NULL REFERENCES rounds(id) ON DELETE CASCADE,
+      hole_number INTEGER NOT NULL,
+      PRIMARY KEY (round_id, hole_number)
+    );
+
     -- 'invited' rows are a pending invite; 'joined' rows are an active
     -- participant. A creator's own row starts 'joined'. joined_at is null
     -- until the status flips.

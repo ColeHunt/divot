@@ -90,7 +90,10 @@ export interface RoundState {
   format: RoundFormat;
   /** Monotonic revision. Clients ignore snapshots older than the one they hold. */
   rev: number;
+  /** Only the holes actually being played — e.g. 9 of 18 for a front/back-9 round. */
   course: Course;
+  /** "Front 9" / "Back 9" for a partial round on an 18-hole course; null when the whole course is being played. */
+  holesLabel: string | null;
   createdBy: string;
   startedAt: number;
   completedAt: number | null;
@@ -107,6 +110,7 @@ export interface RoundSummary {
   format: RoundFormat;
   courseName: string;
   courseId: string;
+  holesLabel: string | null;
   startedAt: number;
   completedAt: number | null;
   playerNames: string[];

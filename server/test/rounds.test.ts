@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { openDb, setDb } from '../src/db.js';
+import { getDb, openDb, setDb } from '../src/db.js';
 import { register } from '../src/users.js';
 import { acceptFriendRequest, listFriendRequests, sendFriendRequest } from '../src/friends.js';
 import { createCourse } from '../src/courses.js';
@@ -29,7 +29,13 @@ let courseId: string;
 
 function startRound(
   creatorId: string,
-  input: { courseId?: string; inviteFriendIds?: string[]; format?: string; teams?: unknown } = {},
+  input: {
+    courseId?: string;
+    inviteFriendIds?: string[];
+    format?: string;
+    teams?: unknown;
+    holesSelection?: string;
+  } = {},
 ) {
   return createRound(creatorId, { courseId, ...input });
 }
@@ -314,5 +320,70 @@ describe('team management', () => {
     const teamId = getRoundState(code).teams[0]!.id;
     renameTeam(code, alice, teamId, 'The Eagles');
     expect(getRoundState(code).teams[0]!.name).toBe('The Eagles');
+  });
+});
+
+describe('holes selection (front9 / back9 / full)', () => {
+  let course18: string;
+
+  beforeEach(() => {
+    course18 = createCourse(
+      alice,
+      'Big Course',
+      null,
+      Array.from({ length: 18 }, (_, i) => ({ number: i + 1, par: 4 })),
+    ).id;
+  });
+
+  it('defaults to the full course when no selection is given', () => {
+    const { code } = startRound(alice, { courseId: course18 });
+    const state = getRoundState(code);
+    expect(state.course.holeCount).toBe(18);
+    expect(state.holesLabel).toBeNull();
+  });
+
+  it('front9 plays only holes 1-9', () => {
+    const { code } = startRound(alice, { courseId: course18, holesSelection: 'front9' });
+    const state = getRoundState(code);
+    expect(state.course.holes.map((h) => h.number)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    expect(state.course.holeCount).toBe(9);
+    expect(state.holesLabel).toBe('Front 9');
+  });
+
+  it('back9 plays only holes 10-18', () => {
+    const { code } = startRound(alice, { courseId: course18, holesSelection: 'back9' });
+    const state = getRoundState(code);
+    expect(state.course.holes.map((h) => h.number)).toEqual([10, 11, 12, 13, 14, 15, 16, 17, 18]);
+    expect(state.holesLabel).toBe('Back 9');
+  });
+
+  it('ignores front9/back9 on a course with fewer than 18 holes', () => {
+    const { code } = startRound(alice, { holesSelection: 'front9' }); // the 3-hole default course
+    const state = getRoundState(code);
+    expect(state.course.holeCount).toBe(3);
+    expect(state.holesLabel).toBeNull();
+  });
+
+  it('rejects scoring a hole outside the selected 9', () => {
+    const { code } = startRound(alice, { courseId: course18, holesSelection: 'front9' });
+    expect(() => setScore(code, alice, 10, 4)).toThrow(RoundError);
+    expect(() => setScore(code, alice, 1, 4)).not.toThrow();
+  });
+
+  it('shows the holes badge in round summaries too', () => {
+    const { code } = startRound(alice, { courseId: course18, holesSelection: 'back9' });
+    const mine = listMyRounds(alice);
+    expect(mine.active.find((r) => r.code === code)?.holesLabel).toBe('Back 9');
+  });
+
+  it('falls back to the whole course for a round with no round_holes snapshot (pre-migration)', () => {
+    const { code, id } = startRound(alice, { courseId: course18, holesSelection: 'front9' });
+    // Simulate a round created before round_holes existed.
+    getDb().prepare('DELETE FROM round_holes WHERE round_id = ?').run(id);
+
+    const state = getRoundState(code);
+    expect(state.course.holeCount).toBe(18);
+    expect(state.holesLabel).toBeNull();
+    expect(() => setScore(code, alice, 15, 4)).not.toThrow();
   });
 });

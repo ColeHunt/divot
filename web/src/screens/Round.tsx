@@ -118,7 +118,9 @@ export function Round({ code }: { code: string }) {
           <div>
             <div className="row-name">{round.course.name}</div>
             <div className="row-meta">
-              {round.course.holeCount} holes{isScramble ? ' · Scramble' : ''}
+              {round.course.holeCount} holes
+              {round.holesLabel ? ` (${round.holesLabel})` : ''}
+              {isScramble ? ' · Scramble' : ''}
             </div>
           </div>
           {isComplete && <span className="badge badge-accent">Final</span>}

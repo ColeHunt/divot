@@ -91,6 +91,7 @@ export function Home() {
                 <div>
                   <div className="row-name">
                     {invite.round.courseName}
+                    {invite.round.holesLabel && <span className="badge badge-muted" style={{ marginLeft: '0.4rem' }}>{invite.round.holesLabel}</span>}
                     {invite.round.format === 'scramble' && <span className="badge badge-muted" style={{ marginLeft: '0.4rem' }}>Scramble</span>}
                   </div>
                   <div className="row-meta">Code {invite.round.code}</div>
@@ -144,6 +145,7 @@ export function Home() {
               >
                 <span>
                   {round.courseName}
+                  {round.holesLabel && <span className="badge badge-muted" style={{ marginLeft: '0.4rem' }}>{round.holesLabel}</span>}
                   {round.format === 'scramble' && <span className="badge badge-muted" style={{ marginLeft: '0.4rem' }}>Scramble</span>}
                 </span>
                 <span className="tiny muted">{round.playerNames.join(', ')}</span>
