@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import type { RoundInvite, RoundSummary, SavedCourse } from '@shared/types.js';
+import { Avatar } from '../components/Avatar.js';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
 import { navigate } from '../lib/router.js';
@@ -77,9 +78,16 @@ export function Home() {
     <div className="app">
       <div className="topbar">
         <span className="brand">⛳ Divot</span>
-        <button className="btn-ghost tiny" style={{ padding: 0, minHeight: 0 }} onClick={() => navigate('/account')}>
-          Hey, {user?.name.split(' ')[0]}
-        </button>
+        {user && (
+          <button
+            className="btn-ghost tiny row"
+            style={{ padding: 0, minHeight: 0, gap: '0.4rem' }}
+            onClick={() => navigate('/account')}
+          >
+            Hey, {user.name.split(' ')[0]}
+            <Avatar userId={user.id} name={user.name} />
+          </button>
+        )}
       </div>
 
       {invites.length > 0 && (
