@@ -1,6 +1,7 @@
 import { config } from './config.js';
 import { getDb } from './db.js';
 import { generateId } from './ids.js';
+import { scoresForRoundUser } from './scores.js';
 import { totalStrokes, toPar } from '../../shared/src/scoring.js';
 import type { Course, CourseSummary, Hole, LastRound, SavedCourse } from '../../shared/src/types.js';
 
@@ -206,12 +207,12 @@ interface RoundRow {
   completed_at: number;
 }
 
-interface ScoreRow {
-  hole_number: number;
-  strokes: number;
-}
-
-/** The most recent round a user completed on a course, with their scorecard. Null if never. */
+/**
+ * The most recent round a user completed on a course, with their scorecard.
+ * Null if never played. Works the same for a 'scramble' round as a
+ * 'stroke_play' one — scoresForRoundUser resolves the user's own card either
+ * way, individual or via their team.
+ */
 export function getLastRound(userId: string, courseId: string): LastRound | null {
   const db = getDb();
   const round = db
@@ -225,12 +226,7 @@ export function getLastRound(userId: string, courseId: string): LastRound | null
     .get(courseId, userId) as RoundRow | undefined;
   if (!round) return null;
 
-  const scoreRows = db
-    .prepare('SELECT hole_number, strokes FROM round_scores WHERE round_id = ? AND user_id = ?')
-    .all(round.id, userId) as ScoreRow[];
-  const scores: Record<number, number> = {};
-  for (const row of scoreRows) scores[row.hole_number] = row.strokes;
-
+  const scores = scoresForRoundUser(round.id, userId);
   const holes = holesFor(courseId);
   return {
     roundId: round.id,

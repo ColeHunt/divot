@@ -281,7 +281,7 @@ export function createApp(): express.Express {
 
   api.post('/rounds', (req: AuthedRequest, res) => {
     try {
-      const round = createRound(req.userId!, req.body?.courseId, req.body?.inviteFriendIds);
+      const round = createRound(req.userId!, req.body);
       res.status(201).json(round);
     } catch (error) {
       if (error instanceof RoundError) {

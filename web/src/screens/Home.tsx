@@ -87,7 +87,10 @@ export function Home() {
             {invites.map((invite) => (
               <div key={invite.round.code} className="row between">
                 <div>
-                  <div className="row-name">{invite.round.courseName}</div>
+                  <div className="row-name">
+                    {invite.round.courseName}
+                    {invite.round.format === 'scramble' && <span className="badge badge-muted" style={{ marginLeft: '0.4rem' }}>Scramble</span>}
+                  </div>
                   <div className="row-meta">Code {invite.round.code}</div>
                 </div>
                 <div className="row">
@@ -137,7 +140,10 @@ export function Home() {
                 className="btn btn-ghost btn-full row between"
                 onClick={() => navigate(`/round/${round.code}`)}
               >
-                <span>{round.courseName}</span>
+                <span>
+                  {round.courseName}
+                  {round.format === 'scramble' && <span className="badge badge-muted" style={{ marginLeft: '0.4rem' }}>Scramble</span>}
+                </span>
                 <span className="tiny muted">{round.playerNames.join(', ')}</span>
               </button>
             ))}

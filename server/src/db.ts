@@ -101,6 +101,10 @@ function migrate(instance: Db): void {
       course_id    TEXT NOT NULL REFERENCES courses(id) ON DELETE RESTRICT,
       created_by   TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       status       TEXT NOT NULL DEFAULT 'active',
+      -- 'stroke_play': round_scores holds one card per player. 'scramble':
+      -- players are grouped into round_teams and round_team_scores holds one
+      -- shared card per team instead; round_scores stays empty for that round.
+      format       TEXT NOT NULL DEFAULT 'stroke_play',
       rev          INTEGER NOT NULL DEFAULT 0,
       started_at   INTEGER NOT NULL,
       completed_at INTEGER
@@ -130,5 +134,39 @@ function migrate(instance: Db): void {
       updated_at  INTEGER NOT NULL,
       PRIMARY KEY (round_id, user_id, hole_number)
     );
+
+    -- A scramble round's teams. 'position' keeps them in creation order for
+    -- display, since "Team 1" / "Team 2" default names are not otherwise
+    -- ordered by anything meaningful.
+    CREATE TABLE IF NOT EXISTS round_teams (
+      id       TEXT PRIMARY KEY,
+      round_id TEXT NOT NULL REFERENCES rounds(id) ON DELETE CASCADE,
+      name     TEXT NOT NULL,
+      position INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_round_teams_round ON round_teams(round_id);
+
+    -- A player belongs to at most one team per round; joining a new team
+    -- removes their membership on any other team in the same round first,
+    -- enforced in application code rather than a constraint here.
+    CREATE TABLE IF NOT EXISTS round_team_members (
+      team_id TEXT NOT NULL REFERENCES round_teams(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      PRIMARY KEY (team_id, user_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_round_team_members_user ON round_team_members(user_id);
+
+    CREATE TABLE IF NOT EXISTS round_team_scores (
+      round_id    TEXT NOT NULL REFERENCES rounds(id) ON DELETE CASCADE,
+      team_id     TEXT NOT NULL REFERENCES round_teams(id) ON DELETE CASCADE,
+      hole_number INTEGER NOT NULL,
+      strokes     INTEGER NOT NULL,
+      updated_at  INTEGER NOT NULL,
+      PRIMARY KEY (team_id, hole_number)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_round_team_scores_round ON round_team_scores(round_id);
   `);
 }

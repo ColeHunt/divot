@@ -6,7 +6,11 @@ import { isValidRoundCode, normaliseRoundCode } from './ids.js';
 import {
   RoundError,
   completeRound,
+  createTeam,
   getRoundState,
+  joinTeam,
+  leaveTeam,
+  renameTeam,
   reopenRound,
   roundExists,
   setScore,
@@ -116,6 +120,34 @@ function handleMessage(session: Session, raw: string): void {
       case 'reopen_round': {
         const code = requireSubscribed(session);
         reopenRound(code, session.userId, now);
+        broadcastRound(code);
+        return;
+      }
+
+      case 'create_team': {
+        const code = requireSubscribed(session);
+        createTeam(code, session.userId, message.name);
+        broadcastRound(code);
+        return;
+      }
+
+      case 'join_team': {
+        const code = requireSubscribed(session);
+        joinTeam(code, session.userId, String(message.teamId ?? ''));
+        broadcastRound(code);
+        return;
+      }
+
+      case 'leave_team': {
+        const code = requireSubscribed(session);
+        leaveTeam(code, session.userId);
+        broadcastRound(code);
+        return;
+      }
+
+      case 'rename_team': {
+        const code = requireSubscribed(session);
+        renameTeam(code, session.userId, String(message.teamId ?? ''), message.name);
         broadcastRound(code);
         return;
       }

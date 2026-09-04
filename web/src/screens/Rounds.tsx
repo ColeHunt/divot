@@ -12,7 +12,10 @@ function RoundRow({ round }: { round: RoundSummary }) {
   return (
     <button className="btn btn-ghost btn-full row between" onClick={() => navigate(`/round/${round.code}`)}>
       <span>
-        <span className="row-name">{round.courseName}</span>
+        <span className="row-name">
+          {round.courseName}
+          {round.format === 'scramble' && <span className="badge badge-muted" style={{ marginLeft: '0.4rem' }}>Scramble</span>}
+        </span>
         <span className="tiny muted" style={{ display: 'block' }}>
           {round.playerNames.join(', ')}
         </span>

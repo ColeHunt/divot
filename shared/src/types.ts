@@ -60,13 +60,26 @@ export interface LastRound {
 
 export type RoundStatus = 'active' | 'completed';
 export type RoundPlayerStatus = 'invited' | 'joined';
+export type RoundFormat = 'stroke_play' | 'scramble';
 
 export interface RoundPlayer {
   userId: string;
   name: string;
   status: RoundPlayerStatus;
   joinedAt: number | null;
-  /** Hole number -> strokes. Missing holes have not been entered yet. */
+  /**
+   * Hole number -> strokes. For a 'scramble' round this is always empty —
+   * scoring lives on the player's team instead, in RoundState.teams.
+   */
+  scores: Record<number, number>;
+}
+
+/** A scramble team. Only present on 'scramble' rounds — empty on 'stroke_play'. */
+export interface RoundTeam {
+  id: string;
+  name: string;
+  memberUserIds: string[];
+  /** Hole number -> strokes, the team's shared scorecard. */
   scores: Record<number, number>;
 }
 
@@ -74,6 +87,7 @@ export interface RoundState {
   id: string;
   code: string;
   status: RoundStatus;
+  format: RoundFormat;
   /** Monotonic revision. Clients ignore snapshots older than the one they hold. */
   rev: number;
   course: Course;
@@ -81,6 +95,8 @@ export interface RoundState {
   startedAt: number;
   completedAt: number | null;
   players: RoundPlayer[];
+  /** Populated for 'scramble' rounds; always empty for 'stroke_play'. */
+  teams: RoundTeam[];
 }
 
 /** A trimmed-down RoundState for "my rounds" list views. */
@@ -88,6 +104,7 @@ export interface RoundSummary {
   id: string;
   code: string;
   status: RoundStatus;
+  format: RoundFormat;
   courseName: string;
   courseId: string;
   startedAt: number;
@@ -106,6 +123,10 @@ export type ClientMessage =
   | { t: 'set_score'; code: string; hole: number; strokes: number | null }
   | { t: 'complete_round'; code: string }
   | { t: 'reopen_round'; code: string }
+  | { t: 'create_team'; code: string; name?: string }
+  | { t: 'join_team'; code: string; teamId: string }
+  | { t: 'leave_team'; code: string }
+  | { t: 'rename_team'; code: string; teamId: string; name: string }
   | { t: 'ping' };
 
 export type ServerMessage =
@@ -121,4 +142,6 @@ export type ServerErrorCode =
   | 'rate_limited'
   | 'round_completed'
   | 'round_full'
-  | 'not_your_round';
+  | 'not_your_round'
+  | 'not_on_a_team'
+  | 'team_not_found';

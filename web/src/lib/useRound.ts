@@ -10,6 +10,10 @@ export interface RoundView {
   setScore: (hole: number, strokes: number | null) => void;
   completeRound: () => void;
   reopenRound: () => void;
+  createTeam: (name?: string) => void;
+  joinTeam: (teamId: string) => void;
+  leaveTeam: () => void;
+  renameTeam: (teamId: string, name: string) => void;
   dismissError: () => void;
 }
 
@@ -62,6 +66,22 @@ export function useRound(code: string): RoundView {
     socketRef.current?.send({ t: 'reopen_round', code });
   }, [code]);
 
+  const createTeam = useCallback((name?: string) => {
+    socketRef.current?.send({ t: 'create_team', code, name });
+  }, [code]);
+
+  const joinTeam = useCallback((teamId: string) => {
+    socketRef.current?.send({ t: 'join_team', code, teamId });
+  }, [code]);
+
+  const leaveTeam = useCallback(() => {
+    socketRef.current?.send({ t: 'leave_team', code });
+  }, [code]);
+
+  const renameTeam = useCallback((teamId: string, name: string) => {
+    socketRef.current?.send({ t: 'rename_team', code, teamId, name });
+  }, [code]);
+
   const dismissError = useCallback(() => setError(null), []);
 
   useEffect(() => {
@@ -70,5 +90,18 @@ export function useRound(code: string): RoundView {
     return () => window.clearTimeout(timer);
   }, [error]);
 
-  return { status, round, error, fatalError, setScore, completeRound, reopenRound, dismissError };
+  return {
+    status,
+    round,
+    error,
+    fatalError,
+    setScore,
+    completeRound,
+    reopenRound,
+    createTeam,
+    joinTeam,
+    leaveTeam,
+    renameTeam,
+    dismissError,
+  };
 }

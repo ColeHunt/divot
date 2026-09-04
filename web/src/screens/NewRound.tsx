@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import type { CourseSummary, Friend, SavedCourse } from '@shared/types.js';
+import type { CourseSummary, Friend, RoundFormat, SavedCourse } from '@shared/types.js';
 import { api, ApiError } from '../lib/api.js';
+import { useAuth } from '../lib/auth.js';
 import { navigate } from '../lib/router.js';
 
 function initials(name: string): string {
@@ -12,7 +13,13 @@ function initials(name: string): string {
     .join('');
 }
 
+interface TeamDraft {
+  name: string;
+  memberIds: string[];
+}
+
 export function NewRound() {
+  const { user } = useAuth();
   const preselected = new URLSearchParams(location.search).get('course');
 
   const [saved, setSaved] = useState<SavedCourse[]>([]);
@@ -20,6 +27,8 @@ export function NewRound() {
   const [courseId, setCourseId] = useState<string | null>(preselected);
   const [courseName, setCourseName] = useState<string | null>(null);
   const [invited, setInvited] = useState<Set<string>>(new Set());
+  const [format, setFormat] = useState<RoundFormat>('stroke_play');
+  const [teams, setTeams] = useState<TeamDraft[]>([{ name: 'Team 1', memberIds: user ? [user.id] : [] }]);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<CourseSummary[]>([]);
   const [busy, setBusy] = useState(false);
@@ -64,10 +73,34 @@ export function NewRound() {
   function toggleFriend(id: string) {
     setInvited((current) => {
       const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+        setTeams((t) => t.map((team) => ({ ...team, memberIds: team.memberIds.filter((m) => m !== id) })));
+      } else {
+        next.add(id);
+      }
       return next;
     });
+  }
+
+  function toggleOnTeam(teamIndex: number, personId: string) {
+    setTeams((current) =>
+      current.map((team, i) => {
+        if (i === teamIndex) {
+          const onIt = team.memberIds.includes(personId);
+          return { ...team, memberIds: onIt ? team.memberIds.filter((m) => m !== personId) : [...team.memberIds, personId] };
+        }
+        return { ...team, memberIds: team.memberIds.filter((m) => m !== personId) };
+      }),
+    );
+  }
+
+  function addTeam() {
+    setTeams((current) => [...current, { name: `Team ${current.length + 1}`, memberIds: [] }]);
+  }
+
+  function removeTeam(index: number) {
+    setTeams((current) => current.filter((_, i) => i !== index));
   }
 
   async function start() {
@@ -81,6 +114,8 @@ export function NewRound() {
       const res = await api.post<{ code: string }>('/api/rounds', {
         courseId,
         inviteFriendIds: [...invited],
+        format,
+        teams: format === 'scramble' ? teams : undefined,
       });
       navigate(`/round/${res.code}`);
     } catch (err) {
@@ -89,6 +124,11 @@ export function NewRound() {
       setBusy(false);
     }
   }
+
+  const roster = [
+    ...(user ? [{ id: user.id, name: 'You' }] : []),
+    ...friends.filter((f) => invited.has(f.id)).map((f) => ({ id: f.id, name: f.name.split(' ')[0]! })),
+  ];
 
   return (
     <div className="app">
@@ -136,6 +176,24 @@ export function NewRound() {
       </div>
 
       <div className="card">
+        <h2>Format</h2>
+        <div className="chip-row">
+          <button className="chip" aria-pressed={format === 'stroke_play'} onClick={() => setFormat('stroke_play')}>
+            Stroke play
+          </button>
+          <button className="chip" aria-pressed={format === 'scramble'} onClick={() => setFormat('scramble')}>
+            Scramble
+          </button>
+        </div>
+        {format === 'scramble' && (
+          <p className="tiny muted" style={{ marginTop: '0.5rem' }}>
+            Everyone on a team shares one scorecard. Split into more than one team for multiple
+            scrambles happening in the same round.
+          </p>
+        )}
+      </div>
+
+      <div className="card">
         <h2>Invite friends (optional)</h2>
         {friends.length === 0 ? (
           <p className="tiny muted">Add friends to invite them straight into a round.</p>
@@ -157,6 +215,52 @@ export function NewRound() {
           Anyone can also join with the round's code once it starts.
         </p>
       </div>
+
+      {format === 'scramble' && (
+        <div className="card">
+          <h2>Who's scrambling with whom</h2>
+          <div className="stack">
+            {teams.map((team, index) => (
+              <div key={index} className="card" style={{ margin: 0, background: 'var(--surface-2)' }}>
+                <div className="row between" style={{ marginBottom: '0.5rem' }}>
+                  <input
+                    value={team.name}
+                    onChange={(e) =>
+                      setTeams((current) => current.map((t, i) => (i === index ? { ...t, name: e.target.value } : t)))
+                    }
+                    maxLength={30}
+                    style={{ fontWeight: 600 }}
+                  />
+                  {teams.length > 1 && (
+                    <button className="btn-ghost tiny" style={{ padding: '0 0 0 0.5rem', minHeight: 0 }} onClick={() => removeTeam(index)}>
+                      Remove
+                    </button>
+                  )}
+                </div>
+                <div className="chip-row">
+                  {roster.map((person) => (
+                    <button
+                      key={person.id}
+                      className="chip"
+                      aria-pressed={team.memberIds.includes(person.id)}
+                      onClick={() => toggleOnTeam(index, person.id)}
+                    >
+                      {person.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          <button className="btn btn-sm" style={{ marginTop: '0.6rem' }} onClick={addTeam}>
+            + Add another team
+          </button>
+          <p className="tiny muted" style={{ marginTop: '0.6rem' }}>
+            Anyone left off a team, or who joins later with the code, can create or join one once
+            they're in the round.
+          </p>
+        </div>
+      )}
 
       <button className="btn btn-primary btn-full" onClick={start} disabled={busy || !courseId}>
         Start round

@@ -75,7 +75,7 @@ describe('getLastRound', () => {
     ]);
     expect(getLastRound(alice, course.id)).toBeNull();
 
-    const { code } = createRound(alice, course.id, []);
+    const { code } = createRound(alice, { courseId: course.id });
     setScore(code, alice, 1, 5);
     setScore(code, alice, 2, 3);
     expect(getLastRound(alice, course.id)).toBeNull(); // still active
@@ -90,14 +90,30 @@ describe('getLastRound', () => {
   it('returns the most recently completed round when there are several', () => {
     const course = createCourse(alice, 'Pebble Creek', null, [{ number: 1, par: 4 }]);
 
-    const first = createRound(alice, course.id, [], 1000);
+    const first = createRound(alice, { courseId: course.id }, 1000);
     setScore(first.code, alice, 1, 5, 1000);
     completeRound(first.code, alice, 2000);
 
-    const second = createRound(alice, course.id, [], 3000);
+    const second = createRound(alice, { courseId: course.id }, 3000);
     setScore(second.code, alice, 1, 3, 3000);
     completeRound(second.code, alice, 4000);
 
     expect(getLastRound(alice, course.id)?.code).toBe(second.code);
+  });
+
+  it('resolves through a team scorecard for a scramble round', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [
+      { number: 1, par: 4 },
+      { number: 2, par: 3 },
+    ]);
+
+    const { code } = createRound(alice, { courseId: course.id, format: 'scramble' });
+    setScore(code, alice, 1, 5);
+    setScore(code, alice, 2, 4);
+    completeRound(code, alice);
+
+    const last = getLastRound(alice, course.id);
+    expect(last?.totalStrokes).toBe(9);
+    expect(last?.scores).toEqual({ 1: 5, 2: 4 });
   });
 });

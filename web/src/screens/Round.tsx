@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import type { RoundTeam } from '@shared/types.js';
 import { formatToPar, holesPlayed, toPar, totalStrokes } from '@shared/scoring.js';
 import { useAuth } from '../lib/auth.js';
 import { useRound } from '../lib/useRound.js';
@@ -9,13 +10,36 @@ function strokeOptions(par: number): number[] {
   return Array.from({ length: 6 }, (_, i) => start + i);
 }
 
+function initials(name: string): string {
+  return name[0]?.toUpperCase() ?? '?';
+}
+
 export function Round({ code }: { code: string }) {
   const { user } = useAuth();
-  const { status, round, error, fatalError, setScore, completeRound, reopenRound } = useRound(code);
+  const {
+    status,
+    round,
+    error,
+    fatalError,
+    setScore,
+    completeRound,
+    reopenRound,
+    createTeam,
+    joinTeam,
+    leaveTeam,
+    renameTeam,
+  } = useRound(code);
   const [holeIndex, setHoleIndex] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [newTeamName, setNewTeamName] = useState('');
+  const [renaming, setRenaming] = useState(false);
+  const [teamNameDraft, setTeamNameDraft] = useState('');
 
   const me = useMemo(() => round?.players.find((p) => p.userId === user?.id) ?? null, [round, user]);
+  const myTeam = useMemo(
+    () => round?.teams.find((t) => user && t.memberUserIds.includes(user.id)) ?? null,
+    [round, user],
+  );
 
   if (fatalError) {
     return (
@@ -40,9 +64,11 @@ export function Round({ code }: { code: string }) {
     );
   }
 
+  const isScramble = round.format === 'scramble';
   const hole = round.course.holes[holeIndex];
-  const myScores = me?.scores ?? {};
+  const myScores = (isScramble ? myTeam?.scores : me?.scores) ?? {};
   const isComplete = round.status === 'completed';
+  const canScore = isScramble ? Boolean(myTeam) : Boolean(me);
 
   function share() {
     const url = `${location.origin}/round/${code}`;
@@ -56,9 +82,21 @@ export function Round({ code }: { code: string }) {
     });
   }
 
-  const leaderboard = [...round.players]
+  function nameFor(userId: string): string {
+    return round!.players.find((p) => p.userId === userId)?.name ?? 'Someone';
+  }
+
+  const playerLeaderboard = [...round.players]
     .filter((p) => p.status === 'joined')
     .sort((a, b) => totalStrokes(a.scores) - totalStrokes(b.scores));
+
+  const teamLeaderboard = [...round.teams].sort(
+    (a, b) => totalStrokes(a.scores) - totalStrokes(b.scores),
+  );
+
+  const unassigned = round.players.filter(
+    (p) => p.status === 'joined' && !round.teams.some((t) => t.memberUserIds.includes(p.userId)),
+  );
 
   return (
     <div className="app">
@@ -78,13 +116,93 @@ export function Round({ code }: { code: string }) {
         <div className="row between">
           <div>
             <div className="row-name">{round.course.name}</div>
-            <div className="row-meta">{round.course.holeCount} holes</div>
+            <div className="row-meta">
+              {round.course.holeCount} holes{isScramble ? ' · Scramble' : ''}
+            </div>
           </div>
           {isComplete && <span className="badge badge-accent">Final</span>}
         </div>
       </div>
 
-      {!isComplete && hole && (
+      {isScramble && !myTeam && (
+        <div className="card">
+          <h2>Join a team</h2>
+          {round.teams.length > 0 && (
+            <div className="stack" style={{ marginBottom: '0.6rem' }}>
+              {round.teams.map((team) => (
+                <div key={team.id} className="row between">
+                  <div>
+                    <div className="row-name">{team.name}</div>
+                    <div className="row-meta">{team.memberUserIds.map(nameFor).join(', ')}</div>
+                  </div>
+                  <button className="btn btn-sm" onClick={() => joinTeam(team.id)}>
+                    Join
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="row">
+            <input
+              value={newTeamName}
+              onChange={(e) => setNewTeamName(e.target.value)}
+              placeholder={`Team ${round.teams.length + 1}`}
+              maxLength={30}
+            />
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => {
+                createTeam(newTeamName.trim() || undefined);
+                setNewTeamName('');
+              }}
+            >
+              New team
+            </button>
+          </div>
+        </div>
+      )}
+
+      {isScramble && myTeam && (
+        <div className="card">
+          <div className="row between">
+            <h2 style={{ margin: 0 }}>Your team</h2>
+            <button className="btn-ghost tiny" style={{ padding: 0, minHeight: 0 }} onClick={() => setRenaming((r) => !r)}>
+              Rename
+            </button>
+          </div>
+          {renaming ? (
+            <div className="row" style={{ marginTop: '0.4rem' }}>
+              <input
+                value={teamNameDraft || myTeam.name}
+                onChange={(e) => setTeamNameDraft(e.target.value)}
+                maxLength={30}
+              />
+              <button
+                className="btn btn-sm btn-primary"
+                onClick={() => {
+                  renameTeam(myTeam.id, (teamNameDraft || myTeam.name).trim());
+                  setRenaming(false);
+                  setTeamNameDraft('');
+                }}
+              >
+                Save
+              </button>
+            </div>
+          ) : (
+            <div className="row-name" style={{ marginTop: '0.2rem' }}>{myTeam.name}</div>
+          )}
+          <div className="row-meta" style={{ marginTop: '0.3rem' }}>
+            {myTeam.memberUserIds.map(nameFor).join(', ')}
+          </div>
+          {!isComplete && (
+            <button className="btn btn-sm btn-ghost btn-danger" style={{ marginTop: '0.6rem' }} onClick={leaveTeam}>
+              Leave team
+            </button>
+          )}
+        </div>
+      )}
+
+      {!isComplete && hole && canScore && (
         <div className="card">
           <div className="hole-nav">
             <button
@@ -133,30 +251,56 @@ export function Round({ code }: { code: string }) {
 
       <div className="card">
         <h2>Leaderboard</h2>
-        <div className="stack">
-          {leaderboard.map((player) => (
-            <div key={player.userId} className="player-score-row">
-              <div className="avatar">{player.name[0]?.toUpperCase()}</div>
-              <div>
-                <div className="row-name">{player.name}</div>
-                <div className="row-meta">
-                  {holesPlayed(player.scores)}/{round.course.holeCount} holes
+        {isScramble ? (
+          <div className="stack">
+            {teamLeaderboard.map((team: RoundTeam) => (
+              <div key={team.id} className="player-score-row">
+                <div className="avatar">{initials(team.name)}</div>
+                <div>
+                  <div className="row-name">{team.name}</div>
+                  <div className="row-meta">
+                    {team.memberUserIds.map(nameFor).join(', ')} · {holesPlayed(team.scores)}/{round.course.holeCount} holes
+                  </div>
+                </div>
+                <div>
+                  <div className="stat">{totalStrokes(team.scores) || '—'}</div>
+                  <div className="row-meta" style={{ textAlign: 'right' }}>
+                    {holesPlayed(team.scores) > 0 ? formatToPar(toPar(team.scores, round.course.holes)) : ''}
+                  </div>
                 </div>
               </div>
-              <div>
-                <div className="stat">{totalStrokes(player.scores) || '—'}</div>
-                <div className="row-meta" style={{ textAlign: 'right' }}>
-                  {holesPlayed(player.scores) > 0 ? formatToPar(toPar(player.scores, round.course.holes)) : ''}
+            ))}
+            {teamLeaderboard.length === 0 && <p className="tiny muted">No teams yet.</p>}
+            {unassigned.length > 0 && (
+              <p className="tiny muted">Not on a team yet: {unassigned.map((p) => p.name).join(', ')}</p>
+            )}
+          </div>
+        ) : (
+          <div className="stack">
+            {playerLeaderboard.map((player) => (
+              <div key={player.userId} className="player-score-row">
+                <div className="avatar">{initials(player.name)}</div>
+                <div>
+                  <div className="row-name">{player.name}</div>
+                  <div className="row-meta">
+                    {holesPlayed(player.scores)}/{round.course.holeCount} holes
+                  </div>
+                </div>
+                <div>
+                  <div className="stat">{totalStrokes(player.scores) || '—'}</div>
+                  <div className="row-meta" style={{ textAlign: 'right' }}>
+                    {holesPlayed(player.scores) > 0 ? formatToPar(toPar(player.scores, round.course.holes)) : ''}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-          {round.players.some((p) => p.status === 'invited') && (
-            <p className="tiny muted">
-              Waiting on: {round.players.filter((p) => p.status === 'invited').map((p) => p.name).join(', ')}
-            </p>
-          )}
-        </div>
+            ))}
+          </div>
+        )}
+        {round.players.some((p) => p.status === 'invited') && (
+          <p className="tiny muted">
+            Waiting on: {round.players.filter((p) => p.status === 'invited').map((p) => p.name).join(', ')}
+          </p>
+        )}
       </div>
 
       <div className="stack">

@@ -18,6 +18,8 @@ export const config = {
   maxPendingRequestsPerUser: 200,
   maxHolesPerCourse: 36,
   maxPlayersPerRound: 12,
+  maxTeamsPerRound: 12,
+  maxTeamNameLength: 30,
   maxMessageBytes: 4096,
   /** Client messages allowed per connection per minute. */
   messagesPerMinute: 120,
