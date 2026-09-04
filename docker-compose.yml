@@ -1,0 +1,21 @@
+services:
+  divot:
+    build: .
+    container_name: divot
+    restart: unless-stopped
+    # No host port publish — the shared rev-proxy reaches this over the `web`
+    # network by container name, divot:8080. Publishing to the host would let
+    # anyone bypass TLS by hitting <droplet-ip>:8080 directly.
+    volumes:
+      - divot-data:/data
+
+volumes:
+  divot-data:
+
+# `web` is the droplet's shared edge network, created and owned by the proxy
+# stack at /opt/proxy (see one4one's docs/SHARED-PROXY-SETUP.md). Nginx Proxy
+# Manager sits on it and routes divot.<domain> -> divot:8080.
+networks:
+  default:
+    name: web
+    external: true

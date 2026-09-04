@@ -1,0 +1,38 @@
+# Install to /etc/systemd/system/divot.service
+#
+#   sudo useradd --system --home /srv/divot --shell /usr/sbin/nologin divot
+#   sudo mkdir -p /var/lib/divot && sudo chown divot:divot /var/lib/divot
+#   sudo systemctl daemon-reload && sudo systemctl enable --now divot
+
+[Unit]
+Description=divot golf tracker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=divot
+Group=divot
+WorkingDirectory=/srv/divot
+ExecStart=/usr/bin/node server/dist/server/src/index.js
+Restart=always
+RestartSec=2
+
+Environment=NODE_ENV=production
+Environment=PORT=8080
+Environment=DATA_DIR=/var/lib/divot
+
+# The SQLite file is the only thing this service ever needs to write.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/divot
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target
