@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { Course, LastRound } from '@shared/types.js';
 import { coursePar, formatToPar } from '@shared/scoring.js';
-import { api } from '../lib/api.js';
+import { api, ApiError } from '../lib/api.js';
+import { useAuth } from '../lib/auth.js';
 import { navigate } from '../lib/router.js';
 
 interface DetailResponse {
@@ -11,8 +12,10 @@ interface DetailResponse {
 }
 
 export function CourseDetail({ id }: { id: string }) {
+  const { isAdmin } = useAuth();
   const [data, setData] = useState<DetailResponse | null>(null);
   const [busy, setBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     setData(null);
@@ -30,6 +33,20 @@ export function CourseDetail({ id }: { id: string }) {
       }
       setData({ ...data, saved: !data.saved });
     } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove() {
+    if (!data) return;
+    if (!window.confirm(`Delete ${data.course.name}? This can't be undone.`)) return;
+    setBusy(true);
+    setDeleteError(null);
+    try {
+      await api.delete(`/api/courses/${id}`);
+      navigate('/courses');
+    } catch (err) {
+      setDeleteError(err instanceof ApiError ? err.message : 'Could not delete this course');
       setBusy(false);
     }
   }
@@ -52,6 +69,11 @@ export function CourseDetail({ id }: { id: string }) {
         <button className="btn-ghost" style={{ padding: 0, minHeight: 0 }} onClick={() => navigate('/courses')}>
           ← Courses
         </button>
+        {isAdmin && (
+          <button className="btn-ghost" style={{ padding: 0, minHeight: 0 }} onClick={() => navigate(`/courses/${course.id}/edit`)}>
+            Edit
+          </button>
+        )}
       </div>
 
       <div className="hero" style={{ padding: '0.5rem 0 1.25rem' }}>
@@ -64,10 +86,22 @@ export function CourseDetail({ id }: { id: string }) {
         <button className="btn btn-primary btn-full" onClick={() => navigate(`/round/new?course=${course.id}`)}>
           Start a round here
         </button>
+        <button className="btn btn-full" onClick={() => navigate(`/courses/${course.id}/stats`)}>
+          View stats
+        </button>
         <button className="btn btn-full" onClick={toggleSave} disabled={busy}>
           {data.saved ? 'Remove from your courses' : 'Save to your courses'}
         </button>
       </div>
+
+      {isAdmin && (
+        <div className="card">
+          <button className="btn btn-full btn-ghost btn-danger" onClick={remove} disabled={busy}>
+            Delete course
+          </button>
+          {deleteError && <p className="tiny" style={{ color: 'var(--danger)', marginTop: '0.5rem' }}>{deleteError}</p>}
+        </div>
+      )}
 
       {lastRound && (
         <div className="card">

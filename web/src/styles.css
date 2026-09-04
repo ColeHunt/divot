@@ -215,7 +215,14 @@ button:focus-visible {
   flex-direction: column;
   align-items: center;
   gap: 0.15rem;
-  padding: 0.6rem 0.25rem;
+  /* A bit more than a plain 0.6rem — on a home-indicator device the fixed
+     ~34px safe-area reserve below (padding-bottom: var(--safe-bottom) on
+     .tabbar, not this) reads as an oddly tall dead strip when the icon row
+     above it is too short; this gives that row more visual weight so the
+     reserved strip looks proportionate rather than dominant. Not something
+     to fix by shrinking the safe-area reserve itself — that space is real,
+     needed so the home-indicator swipe gesture doesn't land on a tab. */
+  padding: 0.75rem 0.25rem;
   font-size: 0.68rem;
   color: var(--text-dim);
   font-weight: 600;
@@ -523,4 +530,55 @@ button:focus-visible {
   .btn:active {
     transform: none;
   }
+}
+
+.line-chart {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.chart-gridline {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.chart-zero-line {
+  stroke: var(--text-dim);
+  stroke-width: 1;
+  stroke-dasharray: 2, 3;
+}
+
+.chart-axis-label {
+  fill: var(--text-dim);
+  font-size: 9px;
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+  margin-top: 0.6rem;
+}
+
+.chart-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+.chart-legend-swatch {
+  width: 14px;
+  height: 0;
+  border-top-width: 3px;
+  border-top-style: solid;
+  flex-shrink: 0;
+}
+
+.stat-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
 }

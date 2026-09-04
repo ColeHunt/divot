@@ -13,6 +13,8 @@ import { Friends } from './screens/Friends.js';
 import { Courses } from './screens/Courses.js';
 import { CourseDetail } from './screens/CourseDetail.js';
 import { NewCourse } from './screens/NewCourse.js';
+import { EditCourse } from './screens/EditCourse.js';
+import { CourseStats } from './screens/CourseStats.js';
 import { NewRound } from './screens/NewRound.js';
 import { Round } from './screens/Round.js';
 import { Rounds } from './screens/Rounds.js';
@@ -44,10 +46,15 @@ function Shell() {
     if (isValidRoundCode(code)) return <Round key={code} code={code} />;
   }
 
+  const editCourseMatch = /^\/courses\/([^/]+)\/edit$/.exec(path);
+  const courseStatsMatch = /^\/courses\/([^/]+)\/stats$/.exec(path);
+
   let screen: ReactNode;
   if (path === '/friends') screen = <Friends />;
   else if (path === '/account') screen = <Account />;
   else if (path === '/courses/new') screen = <NewCourse />;
+  else if (editCourseMatch) screen = <EditCourse key={path} id={editCourseMatch[1]!} />;
+  else if (courseStatsMatch) screen = <CourseStats key={path} id={courseStatsMatch[1]!} />;
   else if (path.startsWith('/courses/')) screen = <CourseDetail key={path} id={path.slice('/courses/'.length)} />;
   else if (path === '/courses') screen = <Courses />;
   else if (path === '/rounds') screen = <Rounds />;

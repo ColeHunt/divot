@@ -5,6 +5,7 @@ import { courseExists, getCourse } from './courses.js';
 import { getUserById } from './users.js';
 import { isFriend } from './friends.js';
 import type {
+  Course,
   RoundFormat,
   RoundInvite,
   RoundPlayer,
@@ -77,6 +78,38 @@ function resolveTeams(creatorId: string, invitees: string[], teamsInput: unknown
 }
 
 /**
+ * Resolves a creation-time hole selection ('front9' | 'back9' | 'full', or
+ * anything else/omitted) against the actual course. Front/back only apply
+ * to an 18+ hole course — split evenly by sorted hole number, not assumed to
+ * be numbered exactly 1-18 — anything else always plays the whole course.
+ */
+function resolveHoleSelection(course: Course, selection: unknown): number[] {
+  const sorted = [...course.holes].map((h) => h.number).sort((a, b) => a - b);
+  if (selection === 'front9' && sorted.length >= 18) return sorted.slice(0, 9);
+  if (selection === 'back9' && sorted.length >= 18) return sorted.slice(-9);
+  return sorted;
+}
+
+/** The holes actually being played in a round, falling back to the whole course for a round created before round_holes existed. */
+function roundHoleNumbers(roundId: string, courseId: string): number[] {
+  const rows = getDb()
+    .prepare('SELECT hole_number FROM round_holes WHERE round_id = ? ORDER BY hole_number ASC')
+    .all(roundId) as Array<{ hole_number: number }>;
+  if (rows.length > 0) return rows.map((r) => r.hole_number);
+  return getCourse(courseId)
+    .holes.map((h) => h.number)
+    .sort((a, b) => a - b);
+}
+
+function computeHolesLabel(playedNumbers: number[], courseHoleCount: number): string | null {
+  if (playedNumbers.length === 0 || playedNumbers.length === courseHoleCount) return null;
+  const sorted = [...playedNumbers].sort((a, b) => a - b);
+  if (sorted.length === 9 && sorted[0] === 1) return 'Front 9';
+  if (sorted.length === 9 && sorted[sorted.length - 1] === courseHoleCount) return 'Back 9';
+  return `${sorted.length} holes`;
+}
+
+/**
  * Starts a round on `courseId`. The creator is an immediate 'joined' player;
  * anyone in `inviteFriendIds` gets an 'invited' row they see on their home
  * screen. Inviting is a convenience on top of the round code, which still
@@ -97,12 +130,14 @@ export function createRound(
     inviteFriendIds?: unknown;
     format?: unknown;
     teams?: unknown;
+    holesSelection?: unknown;
   };
 
   if (typeof body.courseId !== 'string' || !courseExists(body.courseId)) {
     throw new RoundError('bad_request', 'Pick a course to start a round');
   }
   const courseId = body.courseId;
+  const holeNumbers = resolveHoleSelection(getCourse(courseId), body.holesSelection);
 
   const invitees = uniqueIds(body.inviteFriendIds).filter(
     (id) => id !== creatorId && isFriend(creatorId, id),
@@ -136,6 +171,7 @@ export function createRound(
   );
   const insertTeam = db.prepare('INSERT INTO round_teams (id, round_id, name, position) VALUES (?, ?, ?, ?)');
   const insertTeamMember = db.prepare('INSERT INTO round_team_members (team_id, user_id) VALUES (?, ?)');
+  const insertHole = db.prepare('INSERT INTO round_holes (round_id, hole_number) VALUES (?, ?)');
 
   db.transaction(() => {
     insertRound.run(id, code, courseId, creatorId, format, now);
@@ -143,6 +179,7 @@ export function createRound(
     for (const inviteeId of invitees) {
       insertPlayer.run(id, inviteeId, 'invited', creatorId, null);
     }
+    for (const holeNumber of holeNumbers) insertHole.run(id, holeNumber);
     teams.forEach((team, position) => {
       const teamId = generateId();
       insertTeam.run(teamId, id, team.name, position);
@@ -375,9 +412,8 @@ export function setScore(
   requireOpen(round.status);
 
   const holeNumber = Number(hole);
-  const course = getCourse(round.course_id);
-  if (!course.holes.some((h) => h.number === holeNumber)) {
-    throw new RoundError('bad_request', 'That hole is not on this course');
+  if (!roundHoleNumbers(round.id, round.course_id).includes(holeNumber)) {
+    throw new RoundError('bad_request', 'That hole is not part of this round');
   }
 
   const value = strokes == null ? null : Number(strokes);
@@ -436,6 +472,19 @@ export function reopenRound(code: string, userId: string, now = Date.now()): voi
   touch(round.id);
 }
 
+/**
+ * Permanently deletes a round — only its creator can. Every dependent row
+ * (players, scores, teams, round_holes) cascades off rounds.id, so this is
+ * the one place a round's data actually goes away.
+ */
+export function deleteRound(code: string, userId: string): void {
+  const round = loadRound(code);
+  if (round.created_by !== userId) {
+    throw new RoundError('not_your_round', 'Only the round creator can delete it');
+  }
+  getDb().prepare('DELETE FROM rounds WHERE id = ?').run(round.id);
+}
+
 function teamsForRound(roundId: string): RoundTeam[] {
   const db = getDb();
   const teamRows = db
@@ -470,7 +519,11 @@ function scoresFor(roundId: string, userId: string): Record<number, number> {
 
 export function getRoundState(code: string): RoundState {
   const round = loadRound(code);
-  const course = getCourse(round.course_id);
+  const fullCourse = getCourse(round.course_id);
+  const playedNumbers = new Set(roundHoleNumbers(round.id, round.course_id));
+  const playedHoles = fullCourse.holes.filter((h) => playedNumbers.has(h.number));
+  const course: Course = { ...fullCourse, holes: playedHoles, holeCount: playedHoles.length };
+  const holesLabel = computeHolesLabel(playedHoles.map((h) => h.number), fullCourse.holeCount);
   const format = round.format as RoundFormat;
 
   const playerRows = getDb()
@@ -495,6 +548,7 @@ export function getRoundState(code: string): RoundState {
     format,
     rev: round.rev,
     course,
+    holesLabel,
     createdBy: round.created_by,
     startedAt: round.started_at,
     completedAt: round.completed_at,
@@ -510,6 +564,7 @@ interface RoundListRow {
   format: string;
   course_id: string;
   course_name: string;
+  course_hole_count: number;
   started_at: number;
   completed_at: number | null;
 }
@@ -527,6 +582,7 @@ function toSummaries(rows: RoundListRow[]): RoundSummary[] {
     format: row.format as RoundFormat,
     courseName: row.course_name,
     courseId: row.course_id,
+    holesLabel: computeHolesLabel(roundHoleNumbers(row.id, row.course_id), row.course_hole_count),
     startedAt: row.started_at,
     completedAt: row.completed_at,
     playerNames: (namesStmt.all(row.id) as Array<{ name: string }>).map((r) => r.name),
@@ -538,7 +594,7 @@ const MAX_LIST = 25;
 export function listMyRounds(userId: string): { active: RoundSummary[]; recent: RoundSummary[] } {
   const db = getDb();
   const base = `
-    SELECT r.id, r.code, r.status, r.format, r.course_id, c.name AS course_name, r.started_at, r.completed_at
+    SELECT r.id, r.code, r.status, r.format, r.course_id, c.name AS course_name, c.hole_count AS course_hole_count, r.started_at, r.completed_at
     FROM rounds r
     JOIN round_players p ON p.round_id = r.id
     JOIN courses c ON c.id = r.course_id
@@ -556,7 +612,7 @@ export function listMyRounds(userId: string): { active: RoundSummary[]; recent: 
 export function listMyInvites(userId: string): RoundInvite[] {
   const rows = getDb()
     .prepare(
-      `SELECT r.id, r.code, r.status, r.format, r.course_id, c.name AS course_name, r.started_at, r.completed_at, p.invited_by
+      `SELECT r.id, r.code, r.status, r.format, r.course_id, c.name AS course_name, c.hole_count AS course_hole_count, r.started_at, r.completed_at, p.invited_by
        FROM round_players p
        JOIN rounds r ON r.id = p.round_id
        JOIN courses c ON c.id = r.course_id

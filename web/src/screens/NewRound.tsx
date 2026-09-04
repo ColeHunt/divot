@@ -26,6 +26,8 @@ export function NewRound() {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [courseId, setCourseId] = useState<string | null>(preselected);
   const [courseName, setCourseName] = useState<string | null>(null);
+  const [courseHoleCount, setCourseHoleCount] = useState<number | null>(null);
+  const [holesSelection, setHolesSelection] = useState<'full' | 'front9' | 'back9'>('full');
   const [invited, setInvited] = useState<Set<string>>(new Set());
   const [format, setFormat] = useState<RoundFormat>('stroke_play');
   const [teams, setTeams] = useState<TeamDraft[]>([{ name: 'Team 1', memberIds: user ? [user.id] : [] }]);
@@ -43,8 +45,17 @@ export function NewRound() {
       setFriends(friendsRes.friends);
       if (preselected) {
         const match = coursesRes.courses.find((c) => c.id === preselected);
-        if (match) setCourseName(match.name);
-        else api.get<{ course: { name: string } }>(`/api/courses/${preselected}`).then((r) => setCourseName(r.course.name));
+        if (match) {
+          setCourseName(match.name);
+          setCourseHoleCount(match.holeCount);
+        } else {
+          api
+            .get<{ course: { name: string; holeCount: number } }>(`/api/courses/${preselected}`)
+            .then((r) => {
+              setCourseName(r.course.name);
+              setCourseHoleCount(r.course.holeCount);
+            });
+        }
       }
     });
   }, [preselected]);
@@ -63,9 +74,11 @@ export function NewRound() {
     return () => window.clearTimeout(handle);
   }, [query]);
 
-  function pickCourse(id: string, name: string) {
+  function pickCourse(id: string, name: string, holeCount: number) {
     setCourseId(id);
     setCourseName(name);
+    setCourseHoleCount(holeCount);
+    setHolesSelection('full');
     setResults([]);
     setQuery('');
   }
@@ -116,6 +129,7 @@ export function NewRound() {
         inviteFriendIds: [...invited],
         format,
         teams: format === 'scramble' ? teams : undefined,
+        holesSelection,
       });
       navigate(`/round/${res.code}`);
     } catch (err) {
@@ -147,7 +161,15 @@ export function NewRound() {
         {courseId && courseName ? (
           <div className="row between">
             <span className="row-name">{courseName}</span>
-            <button className="btn btn-sm" onClick={() => { setCourseId(null); setCourseName(null); }}>
+            <button
+              className="btn btn-sm"
+              onClick={() => {
+                setCourseId(null);
+                setCourseName(null);
+                setCourseHoleCount(null);
+                setHolesSelection('full');
+              }}
+            >
               Change
             </button>
           </div>
@@ -162,7 +184,7 @@ export function NewRound() {
               <button
                 key={course.id}
                 className="btn btn-ghost btn-full row between"
-                onClick={() => pickCourse(course.id, course.name)}
+                onClick={() => pickCourse(course.id, course.name, course.holeCount)}
               >
                 <span>{course.name}</span>
                 <span className="tiny muted">{course.holeCount} holes</span>
@@ -174,6 +196,23 @@ export function NewRound() {
           </div>
         )}
       </div>
+
+      {courseId && courseHoleCount != null && courseHoleCount >= 18 && (
+        <div className="card">
+          <h2>Holes</h2>
+          <div className="chip-row">
+            <button className="chip" aria-pressed={holesSelection === 'full'} onClick={() => setHolesSelection('full')}>
+              Full 18
+            </button>
+            <button className="chip" aria-pressed={holesSelection === 'front9'} onClick={() => setHolesSelection('front9')}>
+              Front 9
+            </button>
+            <button className="chip" aria-pressed={holesSelection === 'back9'} onClick={() => setHolesSelection('back9')}>
+              Back 9
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="card">
         <h2>Format</h2>

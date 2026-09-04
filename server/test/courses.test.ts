@@ -5,12 +5,15 @@ import { completeRound, createRound, setScore } from '../src/rounds.js';
 import {
   CourseError,
   createCourse,
+  deleteCourse,
+  getCourseStats,
   getLastRound,
   isSaved,
   listSavedCourses,
   saveCourse,
   searchCourses,
   unsaveCourse,
+  updateCourse,
 } from '../src/courses.js';
 
 let alice: string;
@@ -115,5 +118,115 @@ describe('getLastRound', () => {
     const last = getLastRound(alice, course.id);
     expect(last?.totalStrokes).toBe(9);
     expect(last?.scores).toEqual({ 1: 5, 2: 4 });
+  });
+});
+
+describe('getCourseStats', () => {
+  it('is all nulls with zero rounds played', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [{ number: 1, par: 4 }]);
+    expect(getCourseStats(alice, course.id)).toEqual({ roundsPlayed: 0, bestRound: null, lastRound: null });
+  });
+
+  it('reports the same round as both best and last when there is only one', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [
+      { number: 1, par: 4 },
+      { number: 2, par: 3 },
+    ]);
+    const { code } = createRound(alice, { courseId: course.id });
+    setScore(code, alice, 1, 5);
+    setScore(code, alice, 2, 4);
+    completeRound(code, alice);
+
+    const stats = getCourseStats(alice, course.id);
+    expect(stats.roundsPlayed).toBe(1);
+    expect(stats.bestRound?.code).toBe(code);
+    expect(stats.lastRound?.code).toBe(code);
+    expect(stats.bestRound?.totalStrokes).toBe(9);
+  });
+
+  it('picks the lowest-scoring round as best even when it is not the most recent', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [{ number: 1, par: 4 }]);
+
+    const great = createRound(alice, { courseId: course.id }, 1000);
+    setScore(great.code, alice, 1, 3, 1000);
+    completeRound(great.code, alice, 2000);
+
+    const mediocre = createRound(alice, { courseId: course.id }, 3000);
+    setScore(mediocre.code, alice, 1, 6, 3000);
+    completeRound(mediocre.code, alice, 4000);
+
+    const stats = getCourseStats(alice, course.id);
+    expect(stats.roundsPlayed).toBe(2);
+    expect(stats.bestRound?.code).toBe(great.code);
+    expect(stats.lastRound?.code).toBe(mediocre.code);
+  });
+
+  it('excludes an unscored round from "best" but still surfaces it as "last"', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [{ number: 1, par: 4 }]);
+
+    const scored = createRound(alice, { courseId: course.id }, 1000);
+    setScore(scored.code, alice, 1, 5, 1000);
+    completeRound(scored.code, alice, 2000);
+
+    const blank = createRound(alice, { courseId: course.id }, 3000);
+    completeRound(blank.code, alice, 4000);
+
+    const stats = getCourseStats(alice, course.id);
+    expect(stats.bestRound?.code).toBe(scored.code);
+    expect(stats.lastRound?.code).toBe(blank.code);
+  });
+
+  it('only counts completed rounds', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [{ number: 1, par: 4 }]);
+    const { code } = createRound(alice, { courseId: course.id });
+    setScore(code, alice, 1, 4);
+    expect(getCourseStats(alice, course.id)).toEqual({ roundsPlayed: 0, bestRound: null, lastRound: null });
+  });
+});
+
+describe('updateCourse', () => {
+  it('replaces name, location and the full hole list', () => {
+    const course = createCourse(alice, 'Pebble Creek', 'CA', [{ number: 1, par: 4 }]);
+    const updated = updateCourse(course.id, 'Pebble Creek GC', 'Pebble Beach, CA', [
+      { number: 1, par: 5, yardage: 520 },
+      { number: 2, par: 3 },
+    ]);
+    expect(updated.name).toBe('Pebble Creek GC');
+    expect(updated.location).toBe('Pebble Beach, CA');
+    expect(updated.holeCount).toBe(2);
+    expect(updated.holes).toEqual([
+      { number: 1, par: 5, yardage: 520 },
+      { number: 2, par: 3, yardage: null },
+    ]);
+  });
+
+  it('rejects an unknown course', () => {
+    expect(() => updateCourse('nope', 'Name', null, [{ number: 1, par: 4 }])).toThrow(CourseError);
+  });
+
+  it('validates the same as creation', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [{ number: 1, par: 4 }]);
+    expect(() => updateCourse(course.id, '  ', null, [{ number: 1, par: 4 }])).toThrow(CourseError);
+    expect(() => updateCourse(course.id, 'Name', null, [])).toThrow(CourseError);
+  });
+});
+
+describe('deleteCourse', () => {
+  it('removes a course with no rounds played on it', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [{ number: 1, par: 4 }]);
+    deleteCourse(course.id);
+    expect(() => updateCourse(course.id, 'x', null, [{ number: 1, par: 4 }])).toThrow(CourseError);
+  });
+
+  it('refuses to delete a course with round history, without deleting anything', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [{ number: 1, par: 4 }]);
+    createRound(alice, { courseId: course.id });
+    expect(() => deleteCourse(course.id)).toThrow(CourseError);
+    // still there afterward — the attempt didn't partially apply
+    expect(() => updateCourse(course.id, 'still here', null, [{ number: 1, par: 4 }])).not.toThrow();
+  });
+
+  it('rejects an unknown course', () => {
+    expect(() => deleteCourse('nope')).toThrow(CourseError);
   });
 });

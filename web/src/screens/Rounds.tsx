@@ -14,6 +14,7 @@ function RoundRow({ round }: { round: RoundSummary }) {
       <span>
         <span className="row-name">
           {round.courseName}
+          {round.holesLabel && <span className="badge badge-muted" style={{ marginLeft: '0.4rem' }}>{round.holesLabel}</span>}
           {round.format === 'scramble' && <span className="badge badge-muted" style={{ marginLeft: '0.4rem' }}>Scramble</span>}
         </span>
         <span className="tiny muted" style={{ display: 'block' }}>

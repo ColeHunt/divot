@@ -37,6 +37,15 @@ function migrate(instance: Db): void {
       created_at    INTEGER NOT NULL
     );
 
+    -- Presence of a row means that user has admin rights (currently: editing
+    -- and deleting any course in the shared library). Granted by hand only —
+    -- server/src/adminCli.ts, run on the box itself — there is no self-serve
+    -- "become an admin" path anywhere in the app.
+    CREATE TABLE IF NOT EXISTS admins (
+      user_id    TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      granted_at INTEGER NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS sessions (
       token      TEXT PRIMARY KEY,
       user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -134,6 +143,18 @@ function migrate(instance: Db): void {
     );
 
     CREATE INDEX IF NOT EXISTS idx_rounds_course ON rounds(course_id);
+
+    -- The holes actually being played in a round — e.g. just the front 9 of
+    -- an 18-hole course. One row per hole, snapshotted at creation so a
+    -- later edit to the course's own holes never reshapes a round already
+    -- in progress or in the history books. A round with no rows here (any
+    -- round created before this table existed) falls back to every hole on
+    -- the course, which is exactly what it did before this feature shipped.
+    CREATE TABLE IF NOT EXISTS round_holes (
+      round_id    TEXT NOT NULL REFERENCES rounds(id) ON DELETE CASCADE,
+      hole_number INTEGER NOT NULL,
+      PRIMARY KEY (round_id, hole_number)
+    );
 
     -- 'invited' rows are a pending invite; 'joined' rows are an active
     -- participant. A creator's own row starts 'joined'. joined_at is null

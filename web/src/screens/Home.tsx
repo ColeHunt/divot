@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import type { RoundInvite, RoundSummary, SavedCourse } from '@shared/types.js';
+import { Avatar } from '../components/Avatar.js';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
 import { navigate } from '../lib/router.js';
@@ -77,9 +78,16 @@ export function Home() {
     <div className="app">
       <div className="topbar">
         <span className="brand">⛳ Divot</span>
-        <button className="btn-ghost tiny" style={{ padding: 0, minHeight: 0 }} onClick={() => navigate('/account')}>
-          Hey, {user?.name.split(' ')[0]}
-        </button>
+        {user && (
+          <button
+            className="btn-ghost tiny row"
+            style={{ padding: 0, minHeight: 0, gap: '0.4rem' }}
+            onClick={() => navigate('/account')}
+          >
+            Hey, {user.name.split(' ')[0]}
+            <Avatar userId={user.id} name={user.name} />
+          </button>
+        )}
       </div>
 
       {invites.length > 0 && (
@@ -91,6 +99,7 @@ export function Home() {
                 <div>
                   <div className="row-name">
                     {invite.round.courseName}
+                    {invite.round.holesLabel && <span className="badge badge-muted" style={{ marginLeft: '0.4rem' }}>{invite.round.holesLabel}</span>}
                     {invite.round.format === 'scramble' && <span className="badge badge-muted" style={{ marginLeft: '0.4rem' }}>Scramble</span>}
                   </div>
                   <div className="row-meta">Code {invite.round.code}</div>
@@ -144,6 +153,7 @@ export function Home() {
               >
                 <span>
                   {round.courseName}
+                  {round.holesLabel && <span className="badge badge-muted" style={{ marginLeft: '0.4rem' }}>{round.holesLabel}</span>}
                   {round.format === 'scramble' && <span className="badge badge-muted" style={{ marginLeft: '0.4rem' }}>Scramble</span>}
                 </span>
                 <span className="tiny muted">{round.playerNames.join(', ')}</span>
