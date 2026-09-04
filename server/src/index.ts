@@ -16,6 +16,9 @@ import {
   requireAuth,
   setSessionCookie,
 } from './auth.js';
+import { checkRateLimit, clearRateLimit } from './rateLimit.js';
+import { confirmPasswordReset, requestPasswordReset } from './passwordReset.js';
+import { AvatarError, getAvatar, removeAvatar, setAvatar } from './avatars.js';
 import { attachHub, broadcastRound } from './hub.js';
 import {
   FriendError,
@@ -49,7 +52,7 @@ import {
   listMyRounds,
   roundExists,
 } from './rounds.js';
-import { UserError, getUserById, login, register, searchUsers } from './users.js';
+import { UserError, getUserById, login, normaliseEmail, register, searchUsers, updateName } from './users.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -81,7 +84,10 @@ function errorStatus(code: string): number {
     case 'not_a_player':
       return 409;
     case 'bad_credentials':
+    case 'invalid_reset_token':
       return 401;
+    case 'rate_limited':
+      return 429;
     default:
       return 400;
   }
@@ -89,7 +95,13 @@ function errorStatus(code: string): number {
 
 export function createApp(): express.Express {
   const app = express();
-  app.use(express.json({ limit: '32kb' }));
+  // Exactly one hop of proxying in front (Nginx Proxy Manager) — trusts its
+  // X-Forwarded-For/Proto so req.ip is the real client (rate limiting) and
+  // req.protocol correctly reads 'https' (building reset-password links).
+  app.set('trust proxy', 1);
+  // 3mb, not 32kb, to leave headroom for a base64-encoded avatar upload
+  // (client-resized to ~1.5mb raw, which inflates by ~4/3 as base64).
+  app.use(express.json({ limit: '3mb' }));
   app.use(attachUser);
 
   app.get('/api/health', (_req, res) => {
@@ -102,7 +114,7 @@ export function createApp(): express.Express {
     try {
       const user = register(req.body?.email, req.body?.password, req.body?.name);
       const token = createSession(user.id);
-      setSessionCookie(res, token);
+      setSessionCookie(res, token, true);
       res.status(201).json({ user });
     } catch (error) {
       if (error instanceof UserError) {
@@ -114,10 +126,16 @@ export function createApp(): express.Express {
   });
 
   app.post('/api/auth/login', (req, res) => {
+    const rateLimitKey = `login:${req.ip}:${normaliseEmail(req.body?.email)}`;
+    if (!checkRateLimit(rateLimitKey, config.loginRateLimit.maxAttempts, config.loginRateLimit.windowMinutes * 60_000)) {
+      res.status(429).json({ error: 'rate_limited', message: 'Too many attempts. Try again in a few minutes.' });
+      return;
+    }
     try {
       const user = login(req.body?.email, req.body?.password);
+      clearRateLimit(rateLimitKey);
       const token = createSession(user.id);
-      setSessionCookie(res, token);
+      setSessionCookie(res, token, req.body?.remember !== false);
       res.json({ user });
     } catch (error) {
       if (error instanceof UserError) {
@@ -148,14 +166,92 @@ export function createApp(): express.Express {
     res.json({ user });
   });
 
+  app.post('/api/auth/forgot-password', async (req, res) => {
+    const rateLimitKey = `reset:${req.ip}:${normaliseEmail(req.body?.email)}`;
+    if (!checkRateLimit(rateLimitKey, config.resetRateLimit.maxAttempts, config.resetRateLimit.windowMinutes * 60_000)) {
+      res.status(429).json({ error: 'rate_limited', message: 'Too many attempts. Try again in a few minutes.' });
+      return;
+    }
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    await requestPasswordReset(req.body?.email, baseUrl);
+    // Always the same response, whether or not that email has an account —
+    // otherwise this endpoint would let anyone probe which emails are registered.
+    res.json({ ok: true });
+  });
+
+  app.post('/api/auth/reset-password', (req, res) => {
+    try {
+      const user = confirmPasswordReset(req.body?.token, req.body?.password);
+      const token = createSession(user.id);
+      setSessionCookie(res, token, true);
+      res.json({ user });
+    } catch (error) {
+      if (error instanceof UserError) {
+        res.status(errorStatus(error.code)).json({ error: error.code, message: error.message });
+        return;
+      }
+      throw error;
+    }
+  });
+
   const api = express.Router();
   api.use(requireAuth);
+
+  api.patch('/auth/me', (req: AuthedRequest, res) => {
+    try {
+      const user = updateName(req.userId!, req.body?.name);
+      res.json({ user });
+    } catch (error) {
+      if (error instanceof UserError) {
+        res.status(errorStatus(error.code)).json({ error: error.code, message: error.message });
+        return;
+      }
+      throw error;
+    }
+  });
 
   // ---- users / friends ----
 
   api.get('/users/search', (req: AuthedRequest, res) => {
     const q = typeof req.query.q === 'string' ? req.query.q : '';
     res.json({ users: searchUsers(q, req.userId!) });
+  });
+
+  // Same visibility as name/email today (any signed-in user, via /users/search) — not just friends.
+  api.get('/users/:id/avatar', (req: AuthedRequest, res) => {
+    const avatar = getAvatar(req.params.id!);
+    if (!avatar) {
+      // Never cached: a "no avatar yet" 404 must not stick around in the
+      // browser past this user's first upload, since most places that show
+      // an avatar (Friends, a round's leaderboard) never pass a cache-busting
+      // version — only this user's own Account screen does, right after they
+      // change it themselves.
+      res.set('Cache-Control', 'no-store').status(404).end();
+      return;
+    }
+    // Short TTL, not the usual "images never change" caching — this image
+    // can be replaced or removed, and most viewers (Friends, a round's
+    // leaderboard) have no cache-busting version to force a fresh fetch when
+    // that happens. A minute bounds how stale someone else's photo can look.
+    res.set('Content-Type', avatar.mimeType).set('Cache-Control', 'private, max-age=60').send(avatar.data);
+  });
+
+  api.put('/users/me/avatar', (req: AuthedRequest, res) => {
+    try {
+      setAvatar(req.userId!, req.body?.dataUrl);
+      res.json({ ok: true });
+    } catch (error) {
+      if (error instanceof AvatarError) {
+        res.status(errorStatus(error.code)).json({ error: error.code, message: error.message });
+        return;
+      }
+      throw error;
+    }
+  });
+
+  api.delete('/users/me/avatar', (req: AuthedRequest, res) => {
+    removeAvatar(req.userId!);
+    res.json({ ok: true });
   });
 
   api.get('/friends', (req: AuthedRequest, res) => {

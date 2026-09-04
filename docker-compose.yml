@@ -8,6 +8,12 @@ services:
     # anyone bypass TLS by hitting <droplet-ip>:8080 directly.
     volumes:
       - divot-data:/data
+    # Optional — password reset emails. Compose reads these from a .env file
+    # in this same directory if present; without them, reset requests still
+    # work but just log the link instead of emailing it. See docs/DEPLOY.md.
+    environment:
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
 
 volumes:
   divot-data:

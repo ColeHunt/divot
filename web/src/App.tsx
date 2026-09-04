@@ -5,6 +5,9 @@ import { isValidRoundCode, normaliseRoundCode } from './lib/roundCode.js';
 import { Nav } from './components/Nav.js';
 import { Login } from './screens/Login.js';
 import { Register } from './screens/Register.js';
+import { ForgotPassword } from './screens/ForgotPassword.js';
+import { ResetPassword } from './screens/ResetPassword.js';
+import { Account } from './screens/Account.js';
 import { Home } from './screens/Home.js';
 import { Friends } from './screens/Friends.js';
 import { Courses } from './screens/Courses.js';
@@ -29,7 +32,10 @@ function Shell() {
   }
 
   if (!user) {
-    return path === '/register' ? <Register /> : <Login />;
+    if (path === '/register') return <Register />;
+    if (path === '/forgot-password') return <ForgotPassword />;
+    if (path === '/reset-password') return <ResetPassword />;
+    return <Login />;
   }
 
   const roundMatch = /^\/round\/([0-9A-Za-z]{6})$/.exec(path);
@@ -40,6 +46,7 @@ function Shell() {
 
   let screen: ReactNode;
   if (path === '/friends') screen = <Friends />;
+  else if (path === '/account') screen = <Account />;
   else if (path === '/courses/new') screen = <NewCourse />;
   else if (path.startsWith('/courses/')) screen = <CourseDetail key={path} id={path.slice('/courses/'.length)} />;
   else if (path === '/courses') screen = <Courses />;

@@ -13,6 +13,24 @@ export const config = {
   sessionCookieName: 'divot_session',
   sessionTtlDays: 30,
 
+  /** Failed sign-in attempts allowed per email+IP before a short lockout. */
+  loginRateLimit: { maxAttempts: 10, windowMinutes: 15 },
+  /** Password reset requests allowed per email+IP — tighter, since each one sends an email. */
+  resetRateLimit: { maxAttempts: 5, windowMinutes: 15 },
+  passwordResetTtlMinutes: 30,
+
+  /**
+   * Sending address for password reset emails; Resend's shared test sender
+   * until a real domain is verified. `||` rather than `??` on purpose — an
+   * unset Docker Compose env var arrives as `''`, not undefined, and that
+   * should fall back too, not send with a blank From header.
+   */
+  emailFrom: process.env.EMAIL_FROM || 'divot <onboarding@resend.dev>',
+  resendApiKey: process.env.RESEND_API_KEY || undefined,
+
+  /** A client-resized avatar should be a few hundred KB at most; this leaves headroom. */
+  maxAvatarBytes: 1_500_000,
+
   /** Guardrails so no single account or round can exhaust the box. */
   maxFriendsPerUser: 500,
   maxPendingRequestsPerUser: 200,
