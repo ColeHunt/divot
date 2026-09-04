@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import type { Course, LastRound } from '@shared/types.js';
+import type { Course, CourseStats, Hole, LastRound } from '@shared/types.js';
 import { coursePar, formatToPar } from '@shared/scoring.js';
+import { LineChart, type ChartSeries } from '../components/LineChart.js';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
 import { navigate } from '../lib/router.js';
@@ -11,15 +12,65 @@ interface DetailResponse {
   lastRound: LastRound | null;
 }
 
+const BEST_COLOR = '#47c98a';
+const LAST_COLOR = '#f2b134';
+const PAR_COLOR = '#6b7d72';
+
+/**
+ * Running total through each hole — strokes if `useToPar` is false, strokes
+ * minus par (how far over/under) if true. A hole with no score (not part of
+ * this round's selection, e.g. a front-9 round) leaves a gap rather than
+ * resetting the total, so the line picks back up from wherever it left off.
+ */
+function cumulative(holes: Hole[], scores: Record<number, number>, useToPar: boolean): (number | null)[] {
+  let sum = 0;
+  let any = false;
+  return holes.map((h) => {
+    const strokes = scores[h.number];
+    if (strokes == null) return any ? sum : null;
+    any = true;
+    sum += useToPar ? strokes - h.par : strokes;
+    return sum;
+  });
+}
+
+/** The running "even par" pace line — cumulative par through each hole, regardless of what was actually played. */
+function cumulativePar(holes: Hole[]): number[] {
+  let sum = 0;
+  return holes.map((h) => {
+    sum += h.par;
+    return sum;
+  });
+}
+
+function Legend({ series }: { series: ChartSeries[] }) {
+  return (
+    <div className="chart-legend">
+      {series.map((s) => (
+        <div key={s.label} className="chart-legend-item">
+          <span
+            className="chart-legend-swatch"
+            style={{ borderTopColor: s.color, borderTopStyle: s.dashed ? 'dashed' : 'solid' }}
+          />
+          {s.label}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function CourseDetail({ id }: { id: string }) {
   const { isAdmin } = useAuth();
   const [data, setData] = useState<DetailResponse | null>(null);
+  const [stats, setStats] = useState<CourseStats | null>(null);
   const [busy, setBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     setData(null);
+    setStats(null);
     api.get<DetailResponse>(`/api/courses/${id}`).then(setData);
+    api.get<CourseStats>(`/api/courses/${id}/stats`).then(setStats);
   }, [id]);
 
   async function toggleSave() {
@@ -62,6 +113,29 @@ export function CourseDetail({ id }: { id: string }) {
   }
 
   const { course, lastRound } = data;
+  const holes = course.holes;
+  const categories = holes.map((h) => h.number);
+  const sameRound = Boolean(
+    stats?.bestRound && stats?.lastRound && stats.bestRound.roundId === stats.lastRound.roundId,
+  );
+
+  const strokesSeries: ChartSeries[] = [];
+  const toParSeries: ChartSeries[] = [];
+
+  function addRoundSeries(label: string, color: string, scores: Record<number, number>) {
+    strokesSeries.push({ label, color, values: cumulative(holes, scores, false) });
+    toParSeries.push({ label, color, values: cumulative(holes, scores, true) });
+  }
+
+  if (stats && stats.roundsPlayed > 0) {
+    if (sameRound) {
+      addRoundSeries('Your round', BEST_COLOR, stats.lastRound!.scores);
+    } else {
+      if (stats.bestRound) addRoundSeries('Best round', BEST_COLOR, stats.bestRound.scores);
+      if (stats.lastRound) addRoundSeries('Last round', LAST_COLOR, stats.lastRound.scores);
+    }
+    strokesSeries.push({ label: 'Par pace', color: PAR_COLOR, dashed: true, values: cumulativePar(holes) });
+  }
 
   return (
     <div className="app">
@@ -86,9 +160,6 @@ export function CourseDetail({ id }: { id: string }) {
         <button className="btn btn-primary btn-full" onClick={() => navigate(`/round/new?course=${course.id}`)}>
           Start a round here
         </button>
-        <button className="btn btn-full" onClick={() => navigate(`/courses/${course.id}/stats`)}>
-          View stats
-        </button>
         <button className="btn btn-full" onClick={toggleSave} disabled={busy}>
           {data.saved ? 'Remove from your courses' : 'Save to your courses'}
         </button>
@@ -103,15 +174,51 @@ export function CourseDetail({ id }: { id: string }) {
         </div>
       )}
 
-      {lastRound && (
-        <div className="card">
-          <h2>Your last round</h2>
-          <div className="row between">
-            <span className="row-name">{lastRound.totalStrokes} strokes</span>
-            <span className="badge badge-accent">{formatToPar(lastRound.toPar)}</span>
+      {stats && stats.roundsPlayed > 0 && (
+        <>
+          <div className="card stat-pair">
+            {sameRound ? (
+              <div>
+                <div className="row-meta">Your only round</div>
+                <div className="row-name">{stats.lastRound!.totalStrokes} strokes</div>
+                <span className="badge badge-accent">{formatToPar(stats.lastRound!.toPar)}</span>
+              </div>
+            ) : (
+              <>
+                {stats.bestRound && (
+                  <div>
+                    <div className="row-meta">Best round</div>
+                    <div className="row-name">{stats.bestRound.totalStrokes} strokes</div>
+                    <span className="badge badge-accent">{formatToPar(stats.bestRound.toPar)}</span>
+                  </div>
+                )}
+                {stats.lastRound && (
+                  <div>
+                    <div className="row-meta">Last round</div>
+                    <div className="row-name">{stats.lastRound.totalStrokes} strokes</div>
+                    <span className="badge badge-muted">{formatToPar(stats.lastRound.toPar)}</span>
+                  </div>
+                )}
+              </>
+            )}
           </div>
-          <p className="tiny muted">{new Date(lastRound.playedAt).toLocaleDateString()}</p>
-        </div>
+
+          <div className="card">
+            <h2>Cumulative strokes</h2>
+            <LineChart categories={categories} series={strokesSeries} />
+            <Legend series={strokesSeries} />
+          </div>
+
+          <div className="card">
+            <h2>Cumulative score to par</h2>
+            <LineChart categories={categories} series={toParSeries} zeroLine />
+            <Legend series={toParSeries} />
+          </div>
+
+          <p className="tiny muted" style={{ textAlign: 'center' }}>
+            {stats.roundsPlayed} round{stats.roundsPlayed === 1 ? '' : 's'} played here.
+          </p>
+        </>
       )}
 
       <div className="card">
