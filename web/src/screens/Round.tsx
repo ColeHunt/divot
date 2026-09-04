@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { RoundTeam } from '@shared/types.js';
 import { formatToPar, holesPlayed, toPar, totalStrokes } from '@shared/scoring.js';
+import { Avatar } from '../components/Avatar.js';
 import { useAuth } from '../lib/auth.js';
 import { useRound } from '../lib/useRound.js';
 import { navigate } from '../lib/router.js';
@@ -279,7 +280,7 @@ export function Round({ code }: { code: string }) {
           <div className="stack">
             {playerLeaderboard.map((player) => (
               <div key={player.userId} className="player-score-row">
-                <div className="avatar">{initials(player.name)}</div>
+                <Avatar userId={player.userId} name={player.name} />
                 <div>
                   <div className="row-name">{player.name}</div>
                   <div className="row-meta">

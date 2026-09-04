@@ -23,7 +23,7 @@ export function ForgotPassword() {
   return (
     <div className="app">
       <div className="hero">
-        <h1>⛳ divot</h1>
+        <h1>⛳ Divot</h1>
       </div>
 
       {sent ? (

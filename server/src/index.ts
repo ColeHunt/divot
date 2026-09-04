@@ -18,6 +18,7 @@ import {
 } from './auth.js';
 import { checkRateLimit, clearRateLimit } from './rateLimit.js';
 import { confirmPasswordReset, requestPasswordReset } from './passwordReset.js';
+import { AvatarError, getAvatar, removeAvatar, setAvatar } from './avatars.js';
 import { attachHub, broadcastRound } from './hub.js';
 import {
   FriendError,
@@ -98,7 +99,9 @@ export function createApp(): express.Express {
   // X-Forwarded-For/Proto so req.ip is the real client (rate limiting) and
   // req.protocol correctly reads 'https' (building reset-password links).
   app.set('trust proxy', 1);
-  app.use(express.json({ limit: '32kb' }));
+  // 3mb, not 32kb, to leave headroom for a base64-encoded avatar upload
+  // (client-resized to ~1.5mb raw, which inflates by ~4/3 as base64).
+  app.use(express.json({ limit: '3mb' }));
   app.use(attachUser);
 
   app.get('/api/health', (_req, res) => {
@@ -212,6 +215,43 @@ export function createApp(): express.Express {
   api.get('/users/search', (req: AuthedRequest, res) => {
     const q = typeof req.query.q === 'string' ? req.query.q : '';
     res.json({ users: searchUsers(q, req.userId!) });
+  });
+
+  // Same visibility as name/email today (any signed-in user, via /users/search) — not just friends.
+  api.get('/users/:id/avatar', (req: AuthedRequest, res) => {
+    const avatar = getAvatar(req.params.id!);
+    if (!avatar) {
+      // Never cached: a "no avatar yet" 404 must not stick around in the
+      // browser past this user's first upload, since most places that show
+      // an avatar (Friends, a round's leaderboard) never pass a cache-busting
+      // version — only this user's own Account screen does, right after they
+      // change it themselves.
+      res.set('Cache-Control', 'no-store').status(404).end();
+      return;
+    }
+    // Short TTL, not the usual "images never change" caching — this image
+    // can be replaced or removed, and most viewers (Friends, a round's
+    // leaderboard) have no cache-busting version to force a fresh fetch when
+    // that happens. A minute bounds how stale someone else's photo can look.
+    res.set('Content-Type', avatar.mimeType).set('Cache-Control', 'private, max-age=60').send(avatar.data);
+  });
+
+  api.put('/users/me/avatar', (req: AuthedRequest, res) => {
+    try {
+      setAvatar(req.userId!, req.body?.dataUrl);
+      res.json({ ok: true });
+    } catch (error) {
+      if (error instanceof AvatarError) {
+        res.status(errorStatus(error.code)).json({ error: error.code, message: error.message });
+        return;
+      }
+      throw error;
+    }
+  });
+
+  api.delete('/users/me/avatar', (req: AuthedRequest, res) => {
+    removeAvatar(req.userId!);
+    res.json({ ok: true });
   });
 
   api.get('/friends', (req: AuthedRequest, res) => {

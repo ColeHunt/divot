@@ -306,6 +306,46 @@ button:focus-visible {
   flex: none;
 }
 
+.avatar-img {
+  object-fit: cover;
+  border: 1px solid var(--border);
+}
+
+.avatar-lg {
+  width: 88px;
+  height: 88px;
+  font-size: 1.8rem;
+}
+
+.avatar-picker {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+}
+
+.avatar-picker input[type='file'] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.avatar-picker .edit-badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  border: 2px solid var(--bg);
+}
+
 /* ---- scorecard ---- */
 .scorecard {
   overflow-x: auto;

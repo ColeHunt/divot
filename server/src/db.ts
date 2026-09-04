@@ -58,6 +58,17 @@ function migrate(instance: Db): void {
 
     CREATE INDEX IF NOT EXISTS idx_password_reset_user ON password_reset_tokens(user_id);
 
+    -- Presence of a row means the user has a custom avatar; absence falls
+    -- back to initials on the client. Stored as a blob in this same database
+    -- rather than a separate directory of files, so one .backup of
+    -- divot.sqlite still covers everything.
+    CREATE TABLE IF NOT EXISTS user_avatars (
+      user_id    TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      mime_type  TEXT NOT NULL,
+      data       BLOB NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
     -- A row is a pending friend request until accepted_at is set, at which
     -- point requester and addressee are friends. Declining or unfriending
     -- deletes the row outright rather than tracking a 'declined' status, so a

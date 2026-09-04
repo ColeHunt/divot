@@ -32,7 +32,7 @@ export function ResetPassword() {
     return (
       <div className="app">
         <div className="hero">
-          <h1>⛳ divot</h1>
+          <h1>⛳ Divot</h1>
         </div>
         <div className="card stack" style={{ textAlign: 'center' }}>
           <p>This link is missing its reset code.</p>
@@ -47,7 +47,7 @@ export function ResetPassword() {
   return (
     <div className="app">
       <div className="hero">
-        <h1>⛳ divot</h1>
+        <h1>⛳ Divot</h1>
         <p className="muted">Choose a new password.</p>
       </div>
 

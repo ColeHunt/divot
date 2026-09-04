@@ -1,19 +1,11 @@
 import { useEffect, useState } from 'react';
 import type { Friend, FriendRequest, User } from '@shared/types.js';
+import { Avatar } from '../components/Avatar.js';
 import { api, ApiError } from '../lib/api.js';
 
 interface RequestsResponse {
   incoming: FriendRequest[];
   outgoing: FriendRequest[];
-}
-
-function initials(name: string): string {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]!.toUpperCase())
-    .join('');
 }
 
 export function Friends() {
@@ -105,7 +97,7 @@ export function Friends() {
             {results.map((user) => (
               <div key={user.id} className="row between">
                 <div className="row">
-                  <div className="avatar">{initials(user.name)}</div>
+                  <Avatar userId={user.id} name={user.name} />
                   <div>
                     <div className="row-name">{user.name}</div>
                     <div className="row-meta">{user.email}</div>
@@ -133,7 +125,7 @@ export function Friends() {
             {incoming.map((request) => (
               <div key={request.id} className="row between">
                 <div className="row">
-                  <div className="avatar">{initials(request.from.name)}</div>
+                  <Avatar userId={request.from.id} name={request.from.name} />
                   <div className="row-name">{request.from.name}</div>
                 </div>
                 <div className="row">
@@ -161,7 +153,7 @@ export function Friends() {
             {friends.map((friend) => (
               <div key={friend.id} className="row between">
                 <div className="row">
-                  <div className="avatar">{initials(friend.name)}</div>
+                  <Avatar userId={friend.id} name={friend.name} />
                   <div className="row-name">{friend.name}</div>
                 </div>
                 <button className="btn btn-sm btn-ghost btn-danger" onClick={() => remove(friend)}>

@@ -28,6 +28,9 @@ export const config = {
   emailFrom: process.env.EMAIL_FROM || 'divot <onboarding@resend.dev>',
   resendApiKey: process.env.RESEND_API_KEY || undefined,
 
+  /** A client-resized avatar should be a few hundred KB at most; this leaves headroom. */
+  maxAvatarBytes: 1_500_000,
+
   /** Guardrails so no single account or round can exhaust the box. */
   maxFriendsPerUser: 500,
   maxPendingRequestsPerUser: 200,

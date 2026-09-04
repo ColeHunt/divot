@@ -26,7 +26,7 @@ export function Register() {
   return (
     <div className="app">
       <div className="hero">
-        <h1>⛳ divot</h1>
+        <h1>⛳ Divot</h1>
         <p className="muted">Rounds, courses and scores, with your friends.</p>
       </div>
 
