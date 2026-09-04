@@ -77,7 +77,9 @@ export function Home() {
     <div className="app">
       <div className="topbar">
         <span className="brand">⛳ divot</span>
-        <span className="muted tiny">Hey, {user?.name.split(' ')[0]}</span>
+        <button className="btn-ghost tiny" style={{ padding: 0, minHeight: 0 }} onClick={() => navigate('/account')}>
+          Hey, {user?.name.split(' ')[0]}
+        </button>
       </div>
 
       {invites.length > 0 && (

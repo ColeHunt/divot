@@ -5,7 +5,14 @@ import type { User } from '../../shared/src/types.js';
 
 export class UserError extends Error {
   constructor(
-    readonly code: 'invalid_email' | 'weak_password' | 'invalid_name' | 'email_taken' | 'bad_credentials',
+    readonly code:
+      | 'invalid_email'
+      | 'weak_password'
+      | 'invalid_name'
+      | 'email_taken'
+      | 'bad_credentials'
+      | 'invalid_reset_token'
+      | 'rate_limited',
     message: string,
   ) {
     super(message);
@@ -15,13 +22,22 @@ export class UserError extends Error {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_NAME_LENGTH = 40;
 
-function normaliseEmail(input: unknown): string {
+/** Exported so callers keying a rate limit by email (auth.ts routes) normalise the same way this module does. */
+export function normaliseEmail(input: unknown): string {
   return typeof input === 'string' ? input.trim().toLowerCase() : '';
 }
 
 function sanitiseName(input: unknown): string {
   const name = typeof input === 'string' ? input.replace(/\s+/g, ' ').trim() : '';
   return name.slice(0, MAX_NAME_LENGTH);
+}
+
+/** Shared by register and password reset — same minimum, one place to change it. */
+export function requireValidPassword(password: unknown): string {
+  if (typeof password !== 'string' || password.length < 8) {
+    throw new UserError('weak_password', 'Password must be at least 8 characters');
+  }
+  return password;
 }
 
 interface UserRow {
@@ -42,9 +58,7 @@ export function register(email: unknown, password: unknown, name: unknown, now =
   const cleanName = sanitiseName(name);
   if (!cleanName) throw new UserError('invalid_name', 'Enter your name');
 
-  if (typeof password !== 'string' || password.length < 8) {
-    throw new UserError('weak_password', 'Password must be at least 8 characters');
-  }
+  const cleanPassword = requireValidPassword(password);
 
   const db = getDb();
   const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(cleanEmail);
@@ -53,7 +67,7 @@ export function register(email: unknown, password: unknown, name: unknown, now =
   const id = generateId();
   db.prepare(
     'INSERT INTO users (id, email, password_hash, name, created_at) VALUES (?, ?, ?, ?, ?)',
-  ).run(id, cleanEmail, hashPassword(password), cleanName, now);
+  ).run(id, cleanEmail, hashPassword(cleanPassword), cleanName, now);
 
   return { id, email: cleanEmail, name: cleanName };
 }
@@ -74,6 +88,26 @@ export function getUserById(id: string): User | null {
     | UserRow
     | undefined;
   return row ? toUser(row) : null;
+}
+
+export function getUserByEmail(email: unknown): User | null {
+  const row = getDb().prepare('SELECT id, email, name FROM users WHERE email = ?').get(normaliseEmail(email)) as
+    | UserRow
+    | undefined;
+  return row ? toUser(row) : null;
+}
+
+export function updateName(userId: string, name: unknown): User {
+  const cleanName = sanitiseName(name);
+  if (!cleanName) throw new UserError('invalid_name', 'Enter your name');
+  getDb().prepare('UPDATE users SET name = ? WHERE id = ?').run(cleanName, userId);
+  return getUserById(userId)!;
+}
+
+/** Used by the password reset flow once a token has been validated — no old-password check, that's the token's job. */
+export function setPassword(userId: string, password: unknown): void {
+  const cleanPassword = requireValidPassword(password);
+  getDb().prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(cleanPassword), userId);
 }
 
 const MAX_SEARCH_RESULTS = 20;

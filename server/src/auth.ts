@@ -45,14 +45,15 @@ export function parseCookies(header: string | undefined): Record<string, string>
   return cookies;
 }
 
-function sessionCookieString(token: string, maxAgeSeconds: number): string {
+/** `maxAgeSeconds` omitted (undefined) makes a browser-session cookie, gone when the browser closes. */
+function sessionCookieString(token: string, maxAgeSeconds: number | undefined): string {
   const attrs = [
     `${config.sessionCookieName}=${encodeURIComponent(token)}`,
     'Path=/',
     'HttpOnly',
     'SameSite=Lax',
-    `Max-Age=${maxAgeSeconds}`,
   ];
+  if (maxAgeSeconds != null) attrs.push(`Max-Age=${maxAgeSeconds}`);
   if (config.isProduction) attrs.push('Secure');
   return attrs.join('; ');
 }
@@ -70,8 +71,16 @@ export function destroySession(token: string): void {
   getDb().prepare('DELETE FROM sessions WHERE token = ?').run(token);
 }
 
-export function setSessionCookie(res: Response, token: string): void {
-  res.setHeader('Set-Cookie', sessionCookieString(token, config.sessionTtlDays * 24 * 3600));
+/**
+ * `remember: true` persists the cookie for sessionTtlDays, same as before this
+ * flag existed. `remember: false` sends no Max-Age at all — the browser drops
+ * it the moment it closes, regardless of the session's own server-side expiry.
+ */
+export function setSessionCookie(res: Response, token: string, remember: boolean): void {
+  res.setHeader(
+    'Set-Cookie',
+    sessionCookieString(token, remember ? config.sessionTtlDays * 24 * 3600 : undefined),
+  );
 }
 
 export function clearSessionCookie(res: Response): void {

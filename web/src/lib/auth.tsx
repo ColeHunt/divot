@@ -5,9 +5,11 @@ import { api, ApiError } from './api.js';
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, remember: boolean) => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
+  resetPassword: (token: string, password: string) => Promise<void>;
+  updateName: (name: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -24,8 +26,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const res = await api.post<{ user: User }>('/api/auth/login', { email, password });
+  const login = useCallback(async (email: string, password: string, remember: boolean) => {
+    const res = await api.post<{ user: User }>('/api/auth/login', { email, password, remember });
     setUser(res.user);
   }, []);
 
@@ -39,8 +41,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
+  const resetPassword = useCallback(async (token: string, password: string) => {
+    const res = await api.post<{ user: User }>('/api/auth/reset-password', { token, password });
+    setUser(res.user);
+  }, []);
+
+  const updateName = useCallback(async (name: string) => {
+    const res = await api.patch<{ user: User }>('/api/auth/me', { name });
+    setUser(res.user);
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, resetPassword, updateName }}>
       {children}
     </AuthContext.Provider>
   );

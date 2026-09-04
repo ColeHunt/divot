@@ -16,6 +16,8 @@ import {
   requireAuth,
   setSessionCookie,
 } from './auth.js';
+import { checkRateLimit, clearRateLimit } from './rateLimit.js';
+import { confirmPasswordReset, requestPasswordReset } from './passwordReset.js';
 import { attachHub, broadcastRound } from './hub.js';
 import {
   FriendError,
@@ -49,7 +51,7 @@ import {
   listMyRounds,
   roundExists,
 } from './rounds.js';
-import { UserError, getUserById, login, register, searchUsers } from './users.js';
+import { UserError, getUserById, login, normaliseEmail, register, searchUsers, updateName } from './users.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -81,7 +83,10 @@ function errorStatus(code: string): number {
     case 'not_a_player':
       return 409;
     case 'bad_credentials':
+    case 'invalid_reset_token':
       return 401;
+    case 'rate_limited':
+      return 429;
     default:
       return 400;
   }
@@ -89,6 +94,10 @@ function errorStatus(code: string): number {
 
 export function createApp(): express.Express {
   const app = express();
+  // Exactly one hop of proxying in front (Nginx Proxy Manager) — trusts its
+  // X-Forwarded-For/Proto so req.ip is the real client (rate limiting) and
+  // req.protocol correctly reads 'https' (building reset-password links).
+  app.set('trust proxy', 1);
   app.use(express.json({ limit: '32kb' }));
   app.use(attachUser);
 
@@ -102,7 +111,7 @@ export function createApp(): express.Express {
     try {
       const user = register(req.body?.email, req.body?.password, req.body?.name);
       const token = createSession(user.id);
-      setSessionCookie(res, token);
+      setSessionCookie(res, token, true);
       res.status(201).json({ user });
     } catch (error) {
       if (error instanceof UserError) {
@@ -114,10 +123,16 @@ export function createApp(): express.Express {
   });
 
   app.post('/api/auth/login', (req, res) => {
+    const rateLimitKey = `login:${req.ip}:${normaliseEmail(req.body?.email)}`;
+    if (!checkRateLimit(rateLimitKey, config.loginRateLimit.maxAttempts, config.loginRateLimit.windowMinutes * 60_000)) {
+      res.status(429).json({ error: 'rate_limited', message: 'Too many attempts. Try again in a few minutes.' });
+      return;
+    }
     try {
       const user = login(req.body?.email, req.body?.password);
+      clearRateLimit(rateLimitKey);
       const token = createSession(user.id);
-      setSessionCookie(res, token);
+      setSessionCookie(res, token, req.body?.remember !== false);
       res.json({ user });
     } catch (error) {
       if (error instanceof UserError) {
@@ -148,8 +163,49 @@ export function createApp(): express.Express {
     res.json({ user });
   });
 
+  app.post('/api/auth/forgot-password', async (req, res) => {
+    const rateLimitKey = `reset:${req.ip}:${normaliseEmail(req.body?.email)}`;
+    if (!checkRateLimit(rateLimitKey, config.resetRateLimit.maxAttempts, config.resetRateLimit.windowMinutes * 60_000)) {
+      res.status(429).json({ error: 'rate_limited', message: 'Too many attempts. Try again in a few minutes.' });
+      return;
+    }
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    await requestPasswordReset(req.body?.email, baseUrl);
+    // Always the same response, whether or not that email has an account —
+    // otherwise this endpoint would let anyone probe which emails are registered.
+    res.json({ ok: true });
+  });
+
+  app.post('/api/auth/reset-password', (req, res) => {
+    try {
+      const user = confirmPasswordReset(req.body?.token, req.body?.password);
+      const token = createSession(user.id);
+      setSessionCookie(res, token, true);
+      res.json({ user });
+    } catch (error) {
+      if (error instanceof UserError) {
+        res.status(errorStatus(error.code)).json({ error: error.code, message: error.message });
+        return;
+      }
+      throw error;
+    }
+  });
+
   const api = express.Router();
   api.use(requireAuth);
+
+  api.patch('/auth/me', (req: AuthedRequest, res) => {
+    try {
+      const user = updateName(req.userId!, req.body?.name);
+      res.json({ user });
+    } catch (error) {
+      if (error instanceof UserError) {
+        res.status(errorStatus(error.code)).json({ error: error.code, message: error.message });
+        return;
+      }
+      throw error;
+    }
+  });
 
   // ---- users / friends ----
 

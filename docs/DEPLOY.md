@@ -198,6 +198,32 @@ Then delete the local copies of both key files.
 | `PORT` | `8080` | Port the Node process listens on |
 | `DATA_DIR` | `./data` | Directory holding `divot.sqlite` |
 | `NODE_ENV` | — | Set to `production` on the server. Also marks session cookies `Secure`, so this must be set once the site is behind HTTPS. |
+| `RESEND_API_KEY` | — | Optional. Enables "forgot password" to actually send an email — see below. Without it, reset requests still work, they just log the link instead. |
+| `EMAIL_FROM` | Resend's shared test sender | Optional. Set once a domain is verified with Resend, e.g. `divot <noreply@colehunt.com>`. |
+
+### Password reset emails (optional)
+
+Password reset uses [Resend](https://resend.com) — free tier is 3,000
+emails/month, no credit card required, plenty for a friends-and-family app.
+
+1. Sign up at resend.com and grab an API key.
+2. (Optional, better deliverability) verify a domain or subdomain — Resend
+   walks through adding a couple of DNS records. Until then, the default
+   `onboarding@resend.dev` sender works fine for testing.
+3. Add the key to `/opt/divot/.env` on the droplet (Compose reads this file
+   automatically, same directory as `docker-compose.yml`):
+   ```bash
+   echo 'RESEND_API_KEY=re_your_key_here' >> /opt/divot/.env
+   # once a domain is verified:
+   echo 'EMAIL_FROM=divot <noreply@yourdomain.com>' >> /opt/divot/.env
+   docker compose up -d
+   ```
+   `docker compose up -d` (no `--build` needed) picks up the new env vars on
+   the existing image.
+
+Until this is set up, "forgot password" on the live site quietly logs the
+reset link to the container's stdout (`docker compose logs divot`) instead of
+emailing it — useful for testing the flow before wiring up Resend for real.
 
 ## Backups
 

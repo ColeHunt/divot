@@ -46,6 +46,18 @@ function migrate(instance: Db): void {
 
     CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 
+    -- One row per outstanding "forgot password" link. Consumed (deleted) on
+    -- use; a fresh request replaces any prior unused token for the same user
+    -- rather than letting old links keep working alongside new ones.
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      token      TEXT PRIMARY KEY,
+      user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_password_reset_user ON password_reset_tokens(user_id);
+
     -- A row is a pending friend request until accepted_at is set, at which
     -- point requester and addressee are friends. Declining or unfriending
     -- deletes the row outright rather than tracking a 'declined' status, so a
