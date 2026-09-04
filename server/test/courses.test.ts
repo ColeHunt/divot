@@ -241,6 +241,19 @@ describe('getHoleHistory', () => {
     setScore(code, alice, 1, 4);
     expect(getHoleHistory(alice, course.id)).toEqual({});
   });
+
+  it('resolves through a team scorecard for a past scramble round', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [
+      { number: 1, par: 4 },
+      { number: 2, par: 3 },
+    ]);
+    const { code } = createRound(alice, { courseId: course.id, format: 'scramble' });
+    setScore(code, alice, 1, 5);
+    setScore(code, alice, 2, 4);
+    completeRound(code, alice);
+
+    expect(getHoleHistory(alice, course.id)).toEqual({ 1: [5], 2: [4] });
+  });
 });
 
 describe('updateCourse', () => {
