@@ -13,26 +13,21 @@
   <rect width="100" height="100" fill="url(#bg)"/>
   <rect width="100" height="100" fill="url(#glow)"/>
 
-  <!-- the green, seen from above -->
-  <ellipse cx="53" cy="76" rx="31" ry="11.5" fill="#1f5c3c"/>
+  <!-- ground, seen side-on: soil below, turf on top, with a clean bite
+       taken out where the club just struck -->
+  <rect x="0" y="70" width="100" height="20" fill="#2a1c12"/>
+  <rect x="0" y="61" width="34" height="9" rx="2" fill="#1f5c3c"/>
+  <rect x="62" y="61" width="38" height="9" rx="2" fill="#1f5c3c"/>
 
-  <!-- the hole the club just tore the divot from -->
-  <ellipse cx="59" cy="76.5" rx="12" ry="6" fill="#241812"/>
-
-  <!-- the club, frozen mid downswing: shaft trailing to the upper right,
-       iron head just past impact at the hole -->
-  <g transform="translate(48,54) rotate(34)">
-    <path d="M2 -2 L-2 -54" fill="none" stroke="#cfd8d2" stroke-width="4.2" stroke-linecap="round"/>
-    <path d="M2 -3 L20 2 L23 16 L4 19 Z" fill="#dfe6e1" stroke="#9aa39c" stroke-width="1.8" stroke-linejoin="round"/>
+  <!-- the club, following through just past impact -->
+  <g transform="translate(46,42) rotate(34)">
+    <path d="M2 -2 L-2 -50" fill="none" stroke="#cfd8d2" stroke-width="4" stroke-linecap="round"/>
+    <path d="M2 -3 L18 2 L21 15 L4 18 Z" fill="#dfe6e1" stroke="#9aa39c" stroke-width="1.7" stroke-linejoin="round"/>
   </g>
 
-  <!-- shadow the flying turf casts back onto the green -->
-  <ellipse cx="30" cy="64" rx="12" ry="4.8" fill="#08130d" opacity="0.35"/>
-
-  <!-- the torn turf, launched up and away from the strike -->
-  <g transform="rotate(-40 30 48)">
-    <path d="M15 51c-3-14 7-24 20-23s20 10 16 21c-3 7-12 11-22 10S17 60 15 51z"
-          fill="#47c98a" stroke="#1c7048" stroke-width="2.2"/>
-    <path d="M16 53c7 5 22 6 32-2" fill="none" stroke="#5a3d26" stroke-width="4.4" stroke-linecap="round"/>
+  <!-- the chunk of turf it just took, still in the air -->
+  <g transform="translate(26,32) rotate(-28)">
+    <rect x="-11" y="-4" width="22" height="14" rx="2" fill="#2a1c12"/>
+    <rect x="-11" y="-4" width="22" height="6" rx="2" fill="#47c98a"/>
   </g>
 </svg>
