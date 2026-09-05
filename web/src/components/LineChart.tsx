@@ -15,7 +15,11 @@ interface LineChartProps {
 }
 
 const WIDTH = 600;
-const PAD_LEFT = 30;
+// Wide enough for a 4-5 character y-axis label (e.g. "-72.2") at the current
+// .chart-axis-label font-size without its leading digit or minus sign
+// clipping against the SVG's own left edge — the viewBox doesn't grow to fit
+// overflowing text the way a normal block element would.
+const PAD_LEFT = 60;
 const PAD_RIGHT = 10;
 const PAD_TOP = 12;
 const PAD_BOTTOM = 22;

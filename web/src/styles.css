@@ -772,9 +772,13 @@ button:focus-visible {
   stroke-dasharray: 2, 3;
 }
 
+/* This lives inside the chart's own SVG, whose 600-unit-wide viewBox renders
+   at roughly half that in actual CSS pixels on a phone — so a font-size set
+   here needs to be about double what it'd take anywhere else on the page to
+   land at a comparable real size. */
 .chart-axis-label {
   fill: var(--text-dim);
-  font-size: 9px;
+  font-size: 19px;
 }
 
 .chart-legend {
