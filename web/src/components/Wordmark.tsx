@@ -1,10 +1,10 @@
-import { FlagIcon } from './icons.js';
+import { DivotChunkIcon } from './icons.js';
 
-/** The "Divot" wordmark — a pin flag paired with the name, styled by the .brand / .hero h1 rules that wrap it. */
+/** The "Divot" wordmark — the app icon's flying turf chunk, shrunk to glyph size, paired with the name. */
 export function Wordmark() {
   return (
     <>
-      <FlagIcon />
+      <DivotChunkIcon />
       Divot
     </>
   );

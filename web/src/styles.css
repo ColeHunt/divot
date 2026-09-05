@@ -261,7 +261,6 @@ button:focus-visible {
 
 .brand svg,
 .hero h1 svg {
-  color: var(--gold);
   flex: none;
 }
 

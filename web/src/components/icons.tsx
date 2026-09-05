@@ -1,8 +1,9 @@
 /**
- * Hand-drawn line icons for the wordmark and the avatar edit badge — the
- * bottom-nav tabs stayed on emoji by request. One stroke language (round
- * caps/joins, 1.7pt) so the two read as a matched pair rather than two
- * different icon styles.
+ * Hand-drawn line icons for the avatar edit badge, and the small two-tone
+ * mark used in the wordmark. The wordmark icon deliberately doesn't share
+ * the line-icon style below it: it's a shrunk-down echo of the app icon's
+ * flying turf chunk (same green-over-soil tile, same tilt), not a glyph, so
+ * it carries its own fixed colors instead of taking one from currentColor.
  */
 import type { SVGProps } from 'react';
 
@@ -23,14 +24,15 @@ function Icon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-/** A pin flag over the green — the Divot wordmark. */
-export function FlagIcon(props: SVGProps<SVGSVGElement>) {
+/** The wordmark's mark: the same flying turf chunk as the app icon, echoed at glyph size. */
+export function DivotChunkIcon(props: SVGProps<SVGSVGElement>) {
   return (
-    <Icon {...props}>
-      <path d="M7 20V4" />
-      <path d="M7 5l8.5 3.2L7 11.4Z" fill="currentColor" stroke="none" />
-      <path d="M3.2 20h8" />
-    </Icon>
+    <svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" {...props}>
+      <g transform="rotate(-12 12 12)">
+        <rect x="5" y="8" width="14" height="9" rx="2" fill="#2a1c12" />
+        <rect x="5" y="8" width="14" height="4" rx="2" fill="#47c98a" />
+      </g>
+    </svg>
   );
 }
 
