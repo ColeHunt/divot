@@ -508,38 +508,50 @@ button:focus-visible {
   border: 2px solid var(--bg);
 }
 
-/* ---- scorecard ---- */
-.scorecard {
-  overflow-x: auto;
-}
-
-.scorecard table {
-  border-collapse: collapse;
-  width: 100%;
-  font-size: 0.85rem;
-}
-
-.scorecard th,
-.scorecard td {
-  padding: 0.4rem 0.3rem;
-  text-align: center;
+/* ---- scorecard ----
+   One row per hole rather than one column per hole: a hole count that fits
+   comfortably down the screen (9, 18) turned into a table wide enough to
+   need horizontal scrolling to read past a handful of holes. --scorecard-cols
+   is set inline per render, since which columns show (yardage, last time)
+   depends on what data this course actually has. */
+.scorecard-row {
+  display: grid;
+  grid-template-columns: repeat(var(--scorecard-cols, 2), 1fr);
+  padding: 0.45rem 0;
   border-bottom: 1px solid var(--border);
-  white-space: nowrap;
+  font-size: 0.9rem;
 }
 
-.scorecard th {
+.scorecard-row:last-child {
+  border-bottom: none;
+}
+
+.scorecard-row > span:first-child {
+  text-align: left;
+  font-weight: 600;
+}
+
+.scorecard-row > span {
+  text-align: center;
+}
+
+.scorecard-head {
   color: var(--text-dim);
   font-weight: 600;
   font-size: 0.72rem;
   text-transform: uppercase;
 }
 
-.scorecard td:first-child,
-.scorecard th:first-child {
-  text-align: left;
-  position: sticky;
-  left: 0;
-  background: var(--surface);
+.scorecard-head > span:first-child {
+  font-weight: 600;
+}
+
+.scorecard-total {
+  font-weight: 700;
+  border-bottom: none;
+  padding-top: 0.6rem;
+  margin-top: 0.2rem;
+  border-top: 1px solid var(--border);
 }
 
 /* The scoring card is the reason someone opens a round mid-play, so it gets
