@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './lib/auth.js';
 import { usePath } from './lib/router.js';
 import { isValidRoundCode, normaliseRoundCode } from './lib/roundCode.js';
 import { Nav } from './components/Nav.js';
+import { ViewportDebug } from './components/ViewportDebug.js';
 import { Login } from './screens/Login.js';
 import { Register } from './screens/Register.js';
 import { ForgotPassword } from './screens/ForgotPassword.js';
@@ -67,9 +68,11 @@ function Shell() {
 }
 
 export function App() {
+  const debugViewport = new URLSearchParams(window.location.search).has('vp');
   return (
     <AuthProvider>
       <Shell />
+      {debugViewport && <ViewportDebug />}
     </AuthProvider>
   );
 }

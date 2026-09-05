@@ -26,16 +26,33 @@ body {
 
 /* The app shell: pinned to the viewport as one flex column, with the tab bar
    as a static row at its end and the scrolling confined to .app inside it.
-   Nothing here depends on a fixed element resolving `bottom: 0` correctly,
-   and the document itself never scrolls, so there's no rubber-band state
-   that can leave the bar detached from the bottom edge. */
+   The document itself never scrolls, so there's no rubber-band state that can
+   leave the bar detached from the bottom edge.
+
+   `inset: 0` resolves against the *layout viewport*, which in a standalone
+   home-screen app on iOS is not always the whole web view: WebKit lays the
+   page out for the inset frame on the first paint and only re-syncs to the
+   real frame after the first scroll gesture. Until then the shell — and so
+   the tab bar at its end — stops short of the physical bottom of the screen,
+   and no element in the document can reach past it. What shows through in
+   that strip is the document canvas, whose colour propagates up from <body>,
+   so that (and only that) is what makes the strip visible or invisible. See
+   the body rules below. */
 #root {
   position: fixed;
   inset: 0;
   display: flex;
   flex-direction: column;
+  background: var(--bg);
 }
 
+/* The canvas colour, not a background anyone sees behind content: #root paints
+   var(--bg) over the entire layout viewport, so this only ever shows in the
+   strip below the shell described above. Left as var(--bg) it reads as a gap
+   under the tab bar; matched to the tab bar's own surface (see
+   body.has-tabbar) it reads as the bar running to the bottom edge, which is
+   what it is. Screens with no tab bar keep var(--bg) so the strip continues
+   the page instead. */
 body {
   margin: 0;
   background: var(--bg);
@@ -48,6 +65,10 @@ body {
   /* The shell owns the viewport and .app owns the scrolling; the document
      itself must never scroll or rubber-band behind them. */
   overflow: hidden;
+}
+
+body.has-tabbar {
+  background: var(--surface);
 }
 
 button {
