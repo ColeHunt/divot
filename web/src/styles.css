@@ -231,6 +231,12 @@ button:focus-visible {
   border-top: 1px solid var(--border);
   padding-bottom: var(--safe-bottom);
   z-index: 10;
+  /* Promotes this fixed element to its own compositing layer — a standard
+     workaround for iOS WebKit sometimes repainting position:fixed elements
+     lazily against a stale viewport snapshot (see the scroll nudge in
+     Nav.tsx for the other half of this fix). */
+  transform: translateZ(0);
+  will-change: transform;
 }
 
 .tabbar button {
