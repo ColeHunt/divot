@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import type { Course, CourseStats, Hole, LastRound } from '@shared/types.js';
 import { coursePar, formatToPar } from '@shared/scoring.js';
 import { ChartLegend, LineChart, type ChartSeries } from '../components/LineChart.js';
@@ -100,6 +100,8 @@ export function CourseDetail({ id }: { id: string }) {
   const { course, lastRound } = data;
   const holes = course.holes;
   const categories = holes.map((h) => h.number);
+  const showYardage = holes.some((h) => h.yardage);
+  const scorecardColumns = 2 + (showYardage ? 1 : 0) + (lastRound ? 1 : 0);
   const sameRound = Boolean(
     stats?.bestRound && stats?.lastRound && stats.bestRound.roundId === stats.lastRound.roundId,
   );
@@ -140,24 +142,6 @@ export function CourseDetail({ id }: { id: string }) {
         {course.location && <p className="muted">{course.location}</p>}
         <p className="tiny muted">{course.holeCount} holes · par {coursePar(course.holes)}</p>
       </div>
-
-      <div className="card stack">
-        <button className="btn btn-primary btn-full" onClick={() => navigate(`/round/new?course=${course.id}`)}>
-          Start a round here
-        </button>
-        <button className="btn btn-full" onClick={toggleSave} disabled={busy}>
-          {data.saved ? 'Remove from your courses' : 'Save to your courses'}
-        </button>
-      </div>
-
-      {isAdmin && (
-        <div className="card">
-          <button className="btn btn-full btn-ghost btn-danger" onClick={remove} disabled={busy}>
-            Delete course
-          </button>
-          {deleteError && <p className="tiny" style={{ color: 'var(--danger)', marginTop: '0.5rem' }}>{deleteError}</p>}
-        </div>
-      )}
 
       {stats && stats.roundsPlayed > 0 && (
         <>
@@ -206,47 +190,47 @@ export function CourseDetail({ id }: { id: string }) {
         </>
       )}
 
+      <div className="card stack">
+        <button className="btn btn-primary btn-full" onClick={() => navigate(`/round/new?course=${course.id}`)}>
+          Start a round here
+        </button>
+        <button className="btn btn-full" onClick={toggleSave} disabled={busy}>
+          {data.saved ? 'Remove from your courses' : 'Save to your courses'}
+        </button>
+      </div>
+
+      {isAdmin && (
+        <div className="card">
+          <button className="btn btn-full btn-ghost btn-danger" onClick={remove} disabled={busy}>
+            Delete course
+          </button>
+          {deleteError && <p className="tiny" style={{ color: 'var(--danger)', marginTop: '0.5rem' }}>{deleteError}</p>}
+        </div>
+      )}
+
       <div className="card">
         <h2>Scorecard</h2>
-        <div className="scorecard">
-          <table>
-            <thead>
-              <tr>
-                <th>Hole</th>
-                {course.holes.map((h) => (
-                  <th key={h.number}>{h.number}</th>
-                ))}
-                <th>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Par</td>
-                {course.holes.map((h) => (
-                  <td key={h.number}>{h.par}</td>
-                ))}
-                <td>{coursePar(course.holes)}</td>
-              </tr>
-              {course.holes.some((h) => h.yardage) && (
-                <tr>
-                  <td>Yards</td>
-                  {course.holes.map((h) => (
-                    <td key={h.number}>{h.yardage ?? '—'}</td>
-                  ))}
-                  <td>{course.holes.reduce((sum, h) => sum + (h.yardage ?? 0), 0) || '—'}</td>
-                </tr>
-              )}
-              {lastRound && (
-                <tr>
-                  <td>Last time</td>
-                  {course.holes.map((h) => (
-                    <td key={h.number}>{lastRound.scores[h.number] ?? '—'}</td>
-                  ))}
-                  <td>{lastRound.totalStrokes}</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        <div className="stack" style={{ '--scorecard-cols': scorecardColumns } as CSSProperties}>
+          <div className="scorecard-row scorecard-head">
+            <span>Hole</span>
+            <span>Par</span>
+            {showYardage && <span>Yds</span>}
+            {lastRound && <span>Last</span>}
+          </div>
+          {course.holes.map((h) => (
+            <div className="scorecard-row" key={h.number}>
+              <span>{h.number}</span>
+              <span>{h.par}</span>
+              {showYardage && <span>{h.yardage ?? '—'}</span>}
+              {lastRound && <span>{lastRound.scores[h.number] ?? '—'}</span>}
+            </div>
+          ))}
+          <div className="scorecard-row scorecard-total">
+            <span>Total</span>
+            <span>{coursePar(course.holes)}</span>
+            {showYardage && <span>{course.holes.reduce((sum, h) => sum + (h.yardage ?? 0), 0) || '—'}</span>}
+            {lastRound && <span>{lastRound.totalStrokes}</span>}
+          </div>
         </div>
       </div>
     </div>
