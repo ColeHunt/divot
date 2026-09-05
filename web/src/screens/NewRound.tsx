@@ -210,7 +210,7 @@ export function NewRound() {
         <h2>Format</h2>
         <div className="chip-row">
           <button className="chip" aria-pressed={format === 'stroke_play'} onClick={() => setFormat('stroke_play')}>
-            Stroke play
+            Stroke Play
           </button>
           <button className="chip" aria-pressed={format === 'scramble'} onClick={() => setFormat('scramble')}>
             Scramble
