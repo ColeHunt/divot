@@ -82,7 +82,7 @@ export function Home() {
           <button
             className="btn-ghost tiny row"
             style={{ padding: 0, minHeight: 0, gap: '0.4rem' }}
-            onClick={() => navigate('/account')}
+            onClick={() => navigate('/profile')}
           >
             Hey, {user.name.split(' ')[0]}
             <Avatar userId={user.id} name={user.name} />

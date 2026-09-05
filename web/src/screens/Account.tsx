@@ -68,8 +68,8 @@ export function Account() {
   return (
     <div className="app">
       <div className="topbar">
-        <button className="btn-ghost" style={{ padding: 0, minHeight: 0 }} onClick={() => navigate('/')}>
-          ← Home
+        <button className="btn-ghost" style={{ padding: 0, minHeight: 0 }} onClick={() => navigate('/profile')}>
+          ← Profile
         </button>
       </div>
 

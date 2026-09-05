@@ -10,6 +10,7 @@ import { ForgotPassword } from './screens/ForgotPassword.js';
 import { ResetPassword } from './screens/ResetPassword.js';
 import { Account } from './screens/Account.js';
 import { Home } from './screens/Home.js';
+import { Profile } from './screens/Profile.js';
 import { Friends } from './screens/Friends.js';
 import { FriendProfile } from './screens/FriendProfile.js';
 import { Courses } from './screens/Courses.js';
@@ -53,6 +54,7 @@ function Shell() {
   let screen: ReactNode;
   if (friendProfileMatch) screen = <FriendProfile key={path} userId={friendProfileMatch[1]!} />;
   else if (path === '/friends') screen = <Friends />;
+  else if (path === '/profile') screen = <Profile />;
   else if (path === '/account') screen = <Account />;
   else if (path === '/courses/new') screen = <NewCourse />;
   else if (editCourseMatch) screen = <EditCourse key={path} id={editCourseMatch[1]!} />;
