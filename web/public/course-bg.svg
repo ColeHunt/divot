@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 800" preserveAspectRatio="xMidYMid slice">
+  <!-- Rough, filling the frame -->
+  <rect width="400" height="800" fill="#16241b"/>
+
+  <g opacity="0.22">
+    <!-- Fairway, winding from the bottom of the screen up to the green. A thick
+         stroke on a single centerline rather than a hand-filled ribbon, so its
+         width is one number to tune instead of two roughly-parallel curves
+         that have to be kept the right distance apart along their whole
+         length. -->
+    <path d="M170 800
+             C 90 700, 110 610, 170 550
+             C 240 480, 150 420, 185 350
+             C 220 280, 300 265, 270 175
+             C 250 110, 220 60, 245 0"
+          fill="none" stroke="#1e3626" stroke-width="130" stroke-linecap="round"/>
+
+    <!-- The green, at the top of the fairway -->
+    <ellipse cx="255" cy="95" rx="95" ry="70" fill="#28492f"/>
+
+    <!-- Pin, planted in the green -->
+    <line x1="255" y1="95" x2="255" y2="45" stroke="#5a5f52" stroke-width="2"/>
+    <path d="M255 47 L281 58 L255 69 Z" fill="#9a8455"/>
+
+    <!-- Bunkers, flanking the fairway's turns -->
+    <ellipse cx="70" cy="600" rx="46" ry="26" fill="#c4a86e" opacity="0.3" transform="rotate(-18 70 600)"/>
+    <ellipse cx="330" cy="330" rx="38" ry="22" fill="#c4a86e" opacity="0.3" transform="rotate(12 330 330)"/>
+    <ellipse cx="365" cy="130" rx="30" ry="18" fill="#c4a86e" opacity="0.26" transform="rotate(-8 365 130)"/>
+
+    <!-- Water hazard, crossing the lower fairway -->
+    <path d="M-20 690
+             C 40 660, 70 705, 130 690
+             C 190 675, 210 715, 270 705
+             C 330 695, 360 730, 420 715
+             L 420 800 L -20 800 Z"
+          fill="#2d5a64" opacity="0.4"/>
+  </g>
+</svg>

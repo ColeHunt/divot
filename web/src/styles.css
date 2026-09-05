@@ -70,10 +70,17 @@ body {
      peak brightness there, a bright edge dropped straight against black. A
      tight one still decays to near var(--bg) by row 0, just over a few
      percent of height instead of a quarter of the screen, so the glow ramps
-     up fast rather than snapping on, and still peaks close to the top. */
+     up fast rather than snapping on, and still peaks close to the top.
+
+     course-bg.svg sits underneath both glows — a faint aerial fairway, green
+     and a couple of hazards, low-opacity enough on its own terms (see the
+     file) that it reads as texture behind the dusk lighting, not a map
+     competing with it. It only ever shows in the gaps between cards, which
+     have their own opaque background. */
   background:
     radial-gradient(ellipse 130% 13% at 50% 6%, rgba(232, 179, 77, 0.16), transparent 62%),
     radial-gradient(ellipse 130% 60% at 8% 112%, rgba(71, 201, 138, 0.12), transparent 62%),
+    url('/course-bg.svg') center / cover no-repeat,
     var(--bg);
 }
 
@@ -343,18 +350,44 @@ button:focus-visible {
   font-weight: 600;
 }
 
+/* A radial-gradient glow behind the icon, not filter: drop-shadow on it.
+   drop-shadow traces the element's actual rendered alpha shape, which is
+   right at first paint but not once it's *transitioning* between filter
+   values — WebKit has rasterized the settled state on load correctly, then
+   after a click (removing the filter from the old tab, adding it to the new
+   one) drawn the animating one as a solid glowing rectangle instead of
+   tracing the emoji's shape. A plain glow layer only ever transitions
+   opacity, which has no such failure mode. */
 .tabbar button .icon {
+  /* z-index: 0, not just position: relative, is what actually matters here:
+     without an explicit z-index this isn't a stacking context on its own, so
+     the ::before's z-index: -1 doesn't stay "just behind the icon" — it
+     escapes to the nearest ancestor that IS one, which sank it below the
+     tab bar's own opaque background. Verified painting nothing at all
+     (computed z-index: auto on this element) before this was added. */
+  position: relative;
+  z-index: 0;
   display: flex;
   font-size: 1.25rem;
-  transition: filter 0.15s ease;
+}
+
+.tabbar button .icon::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(71, 201, 138, 0.55), transparent 70%);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: -1;
 }
 
 .tabbar button[aria-current='true'] {
   color: var(--accent);
 }
 
-.tabbar button[aria-current='true'] .icon {
-  filter: drop-shadow(0 0 6px rgba(71, 201, 138, 0.6));
+.tabbar button[aria-current='true'] .icon::before {
+  opacity: 1;
 }
 
 /* ---- hero ---- */

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import type { RoundInvite, RoundSummary, SavedCourse } from '@shared/types.js';
 import { Avatar } from '../components/Avatar.js';
 import { Wordmark } from '../components/Wordmark.js';
@@ -46,32 +46,6 @@ export function Home() {
     setInvites((current) => current.filter((i) => i.round.code !== roundCode));
   }
 
-  /*
-   * A standalone home-screen app always launches at manifest.json's fixed
-   * start_url, so there's no address bar to add ?vp=1 to for the viewport
-   * debug overlay. This is the only other way in: hold the wordmark for
-   * ~700ms to flip a localStorage flag App.tsx also checks, then reload.
-   */
-  const longPressTimer = useRef<number | null>(null);
-  function startLongPress() {
-    longPressTimer.current = window.setTimeout(() => {
-      try {
-        if (localStorage.getItem('vp-debug') === '1') localStorage.removeItem('vp-debug');
-        else localStorage.setItem('vp-debug', '1');
-      } catch {
-        // private mode or storage disabled — nothing to persist, just skip the reload
-        return;
-      }
-      window.location.reload();
-    }, 700);
-  }
-  function cancelLongPress() {
-    if (longPressTimer.current != null) {
-      window.clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-  }
-
   async function joinWithCode(event: FormEvent) {
     event.preventDefault();
     const cleaned = code.trim().toUpperCase();
@@ -104,15 +78,7 @@ export function Home() {
   return (
     <div className="app">
       <div className="topbar">
-        <span
-          className="brand"
-          onPointerDown={startLongPress}
-          onPointerUp={cancelLongPress}
-          onPointerLeave={cancelLongPress}
-          onPointerCancel={cancelLongPress}
-        >
-          <Wordmark />
-        </span>
+        <span className="brand"><Wordmark /></span>
         {user && (
           <button
             className="btn-ghost tiny row"
