@@ -27,7 +27,17 @@
   box-sizing: border-box;
 }
 
-html,
+/* 100dvh (dynamic viewport height) instead of the old 100% -> 100vh chain —
+   on iOS standalone home-screen apps, a plain 100%-based height can lock in
+   against a stale/larger viewport reference at load, leaving true page
+   content shorter than the screen and stranding a gap between the fixed
+   .tabbar and the real bottom edge until something (e.g. a scroll) forces
+   a layout recalculation. dvh tracks the actual visible viewport directly,
+   so it doesn't need that recalculation to begin with. */
+html {
+  height: 100dvh;
+}
+
 body,
 #root {
   height: 100%;
