@@ -3,18 +3,17 @@
   <rect width="400" height="800" fill="#16241b"/>
 
   <g opacity="0.22">
-    <!-- Fairway, winding from the bottom of the screen up to the green -->
-    <path d="M120 800
-             C 40 690, 60 610, 130 560
-             C 220 495, 90 430, 140 350
-             C 190 270, 320 260, 300 170
-             C 285 105, 210 70, 190 0
-             L 340 0
-             C 360 90, 300 130, 300 190
-             C 300 270, 190 300, 150 370
-             C 110 440, 250 500, 170 570
-             C 110 615, 120 700, 220 800
-             Z" fill="#1e3626"/>
+    <!-- Fairway, winding from the bottom of the screen up to the green. A thick
+         stroke on a single centerline rather than a hand-filled ribbon, so its
+         width is one number to tune instead of two roughly-parallel curves
+         that have to be kept the right distance apart along their whole
+         length. -->
+    <path d="M170 800
+             C 90 700, 110 610, 170 550
+             C 240 480, 150 420, 185 350
+             C 220 280, 300 265, 270 175
+             C 250 110, 220 60, 245 0"
+          fill="none" stroke="#1e3626" stroke-width="130" stroke-linecap="round"/>
 
     <!-- The green, at the top of the fairway -->
     <ellipse cx="255" cy="95" rx="95" ry="70" fill="#28492f"/>
