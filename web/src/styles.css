@@ -60,9 +60,19 @@ body {
   /* A dusk sun catching the top of the frame and a fairway glow rising from
      the bottom-left — both fully transparent by the time they'd cross a card,
      so this only ever reads as depth behind the content, never as a color
-     shift on it. Layered over the flat var(--bg) fallback everywhere else. */
+     shift on it. Layered over the flat var(--bg) fallback everywhere else.
+
+     The gold ellipse's center sits well *below* row 0, not just above it: in
+     an iOS standalone app the status bar is opaque native chrome, entirely
+     outside this element, so however we shade row 0 here is what sits flush
+     against a hard flat black with no way to blend across that seam. Centering
+     the glow near the top (or above it) put it near peak brightness at row 0
+     — a bright edge dropped right against flat black, reading as a hard stop
+     instead of a glow. Pushed down, row 0 lands in the gradient's faint tail
+     instead, so the page starts close to var(--bg) and only warms up a little
+     further down, in the middle of the content itself. */
   background:
-    radial-gradient(ellipse 120% 46% at 50% -8%, rgba(232, 179, 77, 0.14), transparent 60%),
+    radial-gradient(ellipse 130% 55% at 50% 26%, rgba(232, 179, 77, 0.13), transparent 60%),
     radial-gradient(ellipse 130% 60% at 8% 112%, rgba(71, 201, 138, 0.12), transparent 62%),
     var(--bg);
 }
