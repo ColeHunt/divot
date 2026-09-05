@@ -15,6 +15,16 @@
   color-scheme: dark;
 }
 
+/* See main.tsx: in an iOS standalone app the frame includes the home-indicator
+   zone and env(safe-area-inset-bottom) reports 0, so the reserve has to be
+   stated rather than measured. 34px is that zone on every iPhone that has one,
+   and it is what a native tab bar leaves below its labels. Everywhere else the
+   env() value above still applies — 0 in a browser, where the toolbar provides
+   the separation. */
+:root.ios-standalone {
+  --safe-bottom: 34px;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -250,17 +260,18 @@ button:focus-visible {
    against the bottom of the shell by layout rather than by resolving
    `bottom: 0` against a viewport rect.
 
-   No bottom reserve for the home indicator here. Without viewport-fit=cover
-   the layout viewport already stops above it, and the strip it leaves is
-   painted by the canvas in this same surface colour, so the bar reads as
-   running to the bottom edge with nothing drawn under the indicator.
-   Reserving that space again in CSS is what made the bar 150pt tall. */
+   padding-bottom keeps the tap targets clear of the home indicator. It is one
+   reserve, not two: with viewport-fit=cover the frame reserved that zone as
+   well and the bar came out 150pt tall, so --safe-bottom is 0 in a browser
+   (the toolbar separates it) and only takes a value in an iOS standalone app,
+   where the frame reserves nothing. */
 .tabbar {
   flex: none;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   background: var(--surface);
   border-top: 1px solid var(--border);
+  padding-bottom: var(--safe-bottom);
 }
 
 .tabbar button {
