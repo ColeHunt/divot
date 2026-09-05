@@ -60,6 +60,7 @@ import {
   roundExists,
 } from './rounds.js';
 import { UserError, getUserById, login, normaliseEmail, register, searchUsers, updateName } from './users.js';
+import { ProfileError, getProfileStats } from './profile.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -95,6 +96,7 @@ function errorStatus(code: string): number {
     case 'invalid_reset_token':
       return 401;
     case 'not_your_round':
+    case 'not_friends':
       return 403;
     case 'rate_limited':
       return 429;
@@ -274,6 +276,18 @@ export function createApp(): express.Express {
 
   api.get('/friends', (req: AuthedRequest, res) => {
     res.json({ friends: listFriends(req.userId!) });
+  });
+
+  api.get('/users/:id/profile-stats', (req: AuthedRequest, res) => {
+    try {
+      res.json(getProfileStats(req.userId!, req.params.id!));
+    } catch (error) {
+      if (error instanceof ProfileError) {
+        res.status(errorStatus(error.code)).json({ error: error.code, message: error.message });
+        return;
+      }
+      throw error;
+    }
   });
 
   api.get('/friends/requests', (req: AuthedRequest, res) => {

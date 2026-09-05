@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { Friend, FriendRequest, User } from '@shared/types.js';
 import { Avatar } from '../components/Avatar.js';
 import { api, ApiError } from '../lib/api.js';
+import { navigate } from '../lib/router.js';
 
 interface RequestsResponse {
   incoming: FriendRequest[];
@@ -152,10 +153,14 @@ export function Friends() {
           <div className="stack">
             {friends.map((friend) => (
               <div key={friend.id} className="row between">
-                <div className="row">
+                <button
+                  className="btn-ghost row"
+                  style={{ padding: 0, minHeight: 0 }}
+                  onClick={() => navigate(`/friends/${friend.id}`)}
+                >
                   <Avatar userId={friend.id} name={friend.name} />
                   <div className="row-name">{friend.name}</div>
-                </div>
+                </button>
                 <button className="btn btn-sm btn-ghost btn-danger" onClick={() => remove(friend)}>
                   Remove
                 </button>

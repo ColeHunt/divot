@@ -90,6 +90,34 @@ export interface HoleTrend {
   scramble: HoleTrendEntry[];
 }
 
+/** One of a user's completed rounds, for a profile's recent-rounds list or best-round callout. */
+export interface ProfileRound {
+  roundId: string;
+  code: string;
+  courseId: string;
+  courseName: string;
+  format: RoundFormat;
+  playedAt: number;
+  totalStrokes: number;
+  toPar: number;
+}
+
+export interface FavoriteCourse {
+  courseId: string;
+  name: string;
+  roundsPlayed: number;
+}
+
+/** A user's profile: aggregate stats visible to themself and their friends. */
+export interface ProfileStats {
+  user: User;
+  roundsPlayed: number;
+  favoriteCourse: FavoriteCourse | null;
+  bestRound: ProfileRound | null;
+  /** Most recent completed rounds, newest first. */
+  recentRounds: ProfileRound[];
+}
+
 export type RoundStatus = 'active' | 'completed';
 export type RoundPlayerStatus = 'invited' | 'joined';
 export type RoundFormat = 'stroke_play' | 'scramble';

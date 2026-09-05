@@ -11,6 +11,7 @@ import { ResetPassword } from './screens/ResetPassword.js';
 import { Account } from './screens/Account.js';
 import { Home } from './screens/Home.js';
 import { Friends } from './screens/Friends.js';
+import { FriendProfile } from './screens/FriendProfile.js';
 import { Courses } from './screens/Courses.js';
 import { CourseDetail } from './screens/CourseDetail.js';
 import { NewCourse } from './screens/NewCourse.js';
@@ -47,9 +48,11 @@ function Shell() {
   }
 
   const editCourseMatch = /^\/courses\/([^/]+)\/edit$/.exec(path);
+  const friendProfileMatch = /^\/friends\/([^/]+)$/.exec(path);
 
   let screen: ReactNode;
-  if (path === '/friends') screen = <Friends />;
+  if (friendProfileMatch) screen = <FriendProfile key={path} userId={friendProfileMatch[1]!} />;
+  else if (path === '/friends') screen = <Friends />;
   else if (path === '/account') screen = <Account />;
   else if (path === '/courses/new') screen = <NewCourse />;
   else if (editCourseMatch) screen = <EditCourse key={path} id={editCourseMatch[1]!} />;
