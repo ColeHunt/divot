@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Course, CourseStats, Hole, LastRound } from '@shared/types.js';
 import { coursePar, formatToPar } from '@shared/scoring.js';
-import { LineChart, type ChartSeries } from '../components/LineChart.js';
+import { ChartLegend, LineChart, type ChartSeries } from '../components/LineChart.js';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
 import { navigate } from '../lib/router.js';
@@ -43,21 +43,6 @@ function cumulativePar(holes: Hole[]): number[] {
   });
 }
 
-function Legend({ series }: { series: ChartSeries[] }) {
-  return (
-    <div className="chart-legend">
-      {series.map((s) => (
-        <div key={s.label} className="chart-legend-item">
-          <span
-            className="chart-legend-swatch"
-            style={{ borderTopColor: s.color, borderTopStyle: s.dashed ? 'dashed' : 'solid' }}
-          />
-          {s.label}
-        </div>
-      ))}
-    </div>
-  );
-}
 
 export function CourseDetail({ id }: { id: string }) {
   const { isAdmin } = useAuth();
@@ -206,13 +191,13 @@ export function CourseDetail({ id }: { id: string }) {
           <div className="card">
             <h2>Cumulative strokes</h2>
             <LineChart categories={categories} series={strokesSeries} />
-            <Legend series={strokesSeries} />
+            <ChartLegend series={strokesSeries} />
           </div>
 
           <div className="card">
             <h2>Cumulative score to par</h2>
             <LineChart categories={categories} series={toParSeries} zeroLine />
-            <Legend series={toParSeries} />
+            <ChartLegend series={toParSeries} />
           </div>
 
           <p className="tiny muted" style={{ textAlign: 'center' }}>

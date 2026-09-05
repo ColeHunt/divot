@@ -1,7 +1,7 @@
 import { config } from './config.js';
 import { getDb } from './db.js';
 import { generateId } from './ids.js';
-import { scoresForRoundUser } from './scores.js';
+import { puttsForRoundUser, scoresForRoundUser } from './scores.js';
 import { totalStrokes, toPar } from '../../shared/src/scoring.js';
 import type {
   Course,
@@ -9,6 +9,7 @@ import type {
   CourseSummary,
   Hole,
   HoleHistory,
+  HoleTrend,
   LastRound,
   SavedCourse,
 } from '../../shared/src/types.js';
@@ -382,4 +383,44 @@ export function getHoleHistory(
     }
   }
   return history;
+}
+
+const MAX_ROUNDS_FOR_HOLE_TREND = 20;
+
+/**
+ * Strokes and putts on one specific hole across a user's past completed
+ * rounds, oldest first — the data behind a "how have I trended on this
+ * hole" chart. Same personal/scramble split as getHoleHistory, and the
+ * same excludeRoundId behavior.
+ */
+export function getHoleTrend(
+  userId: string,
+  courseId: string,
+  holeNumber: number,
+  excludeRoundId?: string,
+): HoleTrend {
+  const db = getDb();
+  const rounds = db
+    .prepare(
+      `SELECT r.id, r.format, r.completed_at
+       FROM rounds r
+       JOIN round_players p ON p.round_id = r.id
+       WHERE r.course_id = ? AND p.user_id = ? AND r.status = 'completed' AND r.id != ?
+       ORDER BY r.completed_at DESC LIMIT ?`,
+    )
+    .all(courseId, userId, excludeRoundId ?? '', MAX_ROUNDS_FOR_HOLE_TREND) as Array<{
+    id: string;
+    format: string;
+    completed_at: number;
+  }>;
+
+  const trend: HoleTrend = { personal: [], scramble: [] };
+  for (const round of rounds.reverse()) {
+    const strokes = scoresForRoundUser(round.id, userId)[holeNumber];
+    if (strokes == null) continue;
+    const putts = puttsForRoundUser(round.id, userId)[holeNumber] ?? null;
+    const bucket = round.format === 'scramble' ? 'scramble' : 'personal';
+    trend[bucket].push({ playedAt: round.completed_at, strokes, putts });
+  }
+  return trend;
 }

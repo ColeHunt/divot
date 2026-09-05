@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { HoleHistory, RoundTeam } from '@shared/types.js';
+import type { HoleHistory, HoleTrend, RoundTeam } from '@shared/types.js';
 import { formatToPar, holesPlayed, scoreName, toPar, totalPutts, totalStrokes } from '@shared/scoring.js';
 import { Avatar } from '../components/Avatar.js';
+import { ChartLegend, LineChart, type ChartSeries } from '../components/LineChart.js';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
 import { useRound } from '../lib/useRound.js';
@@ -11,6 +12,10 @@ const MIN_STROKES = 1;
 const MAX_STROKES = 20;
 const MIN_PUTTS = 0;
 const MAX_PUTTS = 10;
+
+const STROKES_COLOR = '#47c98a';
+const PUTTS_COLOR = '#f2b134';
+const PAR_COLOR = '#6b7d72';
 
 function initials(name: string): string {
   return name[0]?.toUpperCase() ?? '?';
@@ -23,12 +28,29 @@ function scoreColor(diff: number): string {
   return 'var(--danger)';
 }
 
-/** One row of past strokes on a hole, e.g. "Your history" or "Scramble history". */
-function HistoryChips({ label, strokes, par }: { label: string; strokes: number[]; par: number }) {
+/** One row of past strokes on a hole, e.g. "Your history" or "Scramble history", with an optional link to a fuller trend chart. */
+function HistoryChips({
+  label,
+  strokes,
+  par,
+  onViewStats,
+}: {
+  label: string;
+  strokes: number[];
+  par: number;
+  onViewStats?: () => void;
+}) {
   if (strokes.length === 0) return null;
   return (
     <div style={{ marginTop: '0.7rem' }}>
-      <div className="tiny muted">{label}</div>
+      <div className="row between">
+        <div className="tiny muted">{label}</div>
+        {onViewStats && (
+          <button className="btn-ghost tiny" style={{ padding: 0, minHeight: 0 }} onClick={onViewStats}>
+            View stats
+          </button>
+        )}
+      </div>
       <div className="chip-row" style={{ marginTop: '0.4rem' }}>
         {strokes.map((n, i) => (
           <span key={i} className="badge badge-muted">
@@ -36,6 +58,26 @@ function HistoryChips({ label, strokes, par }: { label: string; strokes: number[
           </span>
         ))}
       </div>
+    </div>
+  );
+}
+
+/** Strokes-and-putts trend on one hole across past personal rounds, oldest first. */
+function HoleTrendChart({ trend, par, loading }: { trend: HoleTrend | null; par: number; loading: boolean }) {
+  if (loading) return <p className="tiny muted" style={{ marginTop: '0.6rem' }}>Loading…</p>;
+  if (!trend || trend.personal.length === 0) return null;
+
+  const categories = trend.personal.map((e) => new Date(e.playedAt).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' }));
+  const series: ChartSeries[] = [
+    { label: 'Strokes', color: STROKES_COLOR, values: trend.personal.map((e) => e.strokes) },
+    { label: 'Putts', color: PUTTS_COLOR, values: trend.personal.map((e) => e.putts) },
+    { label: 'Par', color: PAR_COLOR, dashed: true, values: trend.personal.map(() => par) },
+  ];
+
+  return (
+    <div style={{ marginTop: '0.8rem' }}>
+      <LineChart categories={categories} series={series} height={160} />
+      <ChartLegend series={series} />
     </div>
   );
 }
@@ -66,6 +108,9 @@ export function Round({ code }: { code: string }) {
   const [pending, setPending] = useState(0);
   const [pendingPutts, setPendingPutts] = useState<number | null>(null);
   const [holeHistory, setHoleHistory] = useState<Record<number, HoleHistory>>({});
+  const [showHoleStats, setShowHoleStats] = useState(false);
+  const [holeTrend, setHoleTrend] = useState<HoleTrend | null>(null);
+  const [loadingTrend, setLoadingTrend] = useState(false);
 
   const me = useMemo(() => round?.players.find((p) => p.userId === user?.id) ?? null, [round, user]);
   const myTeam = useMemo(
@@ -98,6 +143,27 @@ export function Round({ code }: { code: string }) {
       .then((res) => setHoleHistory(res.history))
       .catch(() => {});
   }, [code]);
+
+  // Collapse the trend chart and drop its data whenever the viewed hole changes.
+  useEffect(() => {
+    setShowHoleStats(false);
+    setHoleTrend(null);
+  }, [hole?.number]);
+
+  function toggleHoleStats() {
+    if (showHoleStats) {
+      setShowHoleStats(false);
+      return;
+    }
+    setShowHoleStats(true);
+    if (!hole || holeTrend) return;
+    setLoadingTrend(true);
+    api
+      .get<{ trend: HoleTrend }>(`/api/rounds/${code}/holes/${hole.number}/trend`)
+      .then((res) => setHoleTrend(res.trend))
+      .catch(() => {})
+      .finally(() => setLoadingTrend(false));
+  }
 
   if (fatalError) {
     return (
@@ -383,7 +449,9 @@ export function Round({ code }: { code: string }) {
             label="Your history on this hole"
             strokes={holeHistory[hole.number]?.personal ?? []}
             par={hole.par}
+            onViewStats={toggleHoleStats}
           />
+          {showHoleStats && <HoleTrendChart trend={holeTrend} par={hole.par} loading={loadingTrend} />}
           <HistoryChips
             label="Scramble history on this hole"
             strokes={holeHistory[hole.number]?.scramble ?? []}

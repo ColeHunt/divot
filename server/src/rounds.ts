@@ -1,12 +1,13 @@
 import { config } from './config.js';
 import { getDb } from './db.js';
 import { generateId, generateRoundCode } from './ids.js';
-import { courseExists, getCourse, getHoleHistory } from './courses.js';
+import { courseExists, getCourse, getHoleHistory, getHoleTrend } from './courses.js';
 import { getUserById } from './users.js';
 import { isFriend } from './friends.js';
 import type {
   Course,
   HoleHistory,
+  HoleTrend,
   RoundFormat,
   RoundInvite,
   RoundPlayer,
@@ -219,6 +220,12 @@ export function roundExists(code: string): boolean {
 export function getHoleHistoryForRound(code: string, userId: string): Record<number, HoleHistory> {
   const round = loadRound(code);
   return getHoleHistory(userId, round.course_id, round.id);
+}
+
+/** The caller's strokes-and-putts trend on one hole of this round's course, excluding this round itself. */
+export function getHoleTrendForRound(code: string, userId: string, holeNumber: number): HoleTrend {
+  const round = loadRound(code);
+  return getHoleTrend(userId, round.course_id, holeNumber, round.id);
 }
 
 interface PlayerRow {

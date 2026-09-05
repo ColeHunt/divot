@@ -11,6 +11,7 @@ import {
   declineRound,
   deleteRound,
   getHoleHistoryForRound,
+  getHoleTrendForRound,
   getRoundState,
   joinRound,
   joinTeam,
@@ -520,5 +521,26 @@ describe('getHoleHistoryForRound', () => {
 
   it('rejects an unknown code', () => {
     expect(() => getHoleHistoryForRound('ZZZZZZ', alice)).toThrow(RoundError);
+  });
+});
+
+describe('getHoleTrendForRound', () => {
+  it('shows past strokes and putts on this hole, oldest first, excluding the round being played now', () => {
+    const past = startRound(alice);
+    setScore(past.code, alice, 1, 5);
+    setPutts(past.code, alice, 1, 2);
+    completeRound(past.code, alice);
+
+    const current = startRound(alice);
+    setScore(current.code, alice, 1, 3);
+
+    const trend = getHoleTrendForRound(current.code, alice, 1);
+    expect(trend.scramble).toEqual([]);
+    expect(trend.personal).toHaveLength(1);
+    expect(trend.personal[0]).toMatchObject({ strokes: 5, putts: 2 });
+  });
+
+  it('rejects an unknown code', () => {
+    expect(() => getHoleTrendForRound('ZZZZZZ', alice, 1)).toThrow(RoundError);
   });
 });

@@ -76,6 +76,20 @@ export interface HoleHistory {
   scramble: number[];
 }
 
+/** One past visit to a hole, for charting a trend over time. */
+export interface HoleTrendEntry {
+  playedAt: number;
+  strokes: number;
+  /** Null if putts were never entered for this hole in this round. */
+  putts: number | null;
+}
+
+/** A user's strokes-and-putts trend on one hole over time, oldest first — split the same way as HoleHistory. */
+export interface HoleTrend {
+  personal: HoleTrendEntry[];
+  scramble: HoleTrendEntry[];
+}
+
 export type RoundStatus = 'active' | 'completed';
 export type RoundPlayerStatus = 'invited' | 'joined';
 export type RoundFormat = 'stroke_play' | 'scramble';
