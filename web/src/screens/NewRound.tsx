@@ -1,17 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { CourseSummary, Friend, RoundFormat, SavedCourse } from '@shared/types.js';
+import { Avatar } from '../components/Avatar.js';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
 import { navigate } from '../lib/router.js';
-
-function initials(name: string): string {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]!.toUpperCase())
-    .join('');
-}
 
 interface TeamDraft {
   name: string;
@@ -218,7 +210,7 @@ export function NewRound() {
         <h2>Format</h2>
         <div className="chip-row">
           <button className="chip" aria-pressed={format === 'stroke_play'} onClick={() => setFormat('stroke_play')}>
-            Stroke play
+            Stroke Play
           </button>
           <button className="chip" aria-pressed={format === 'scramble'} onClick={() => setFormat('scramble')}>
             Scramble
@@ -245,7 +237,8 @@ export function NewRound() {
                 aria-pressed={invited.has(friend.id)}
                 onClick={() => toggleFriend(friend.id)}
               >
-                {initials(friend.name)} {friend.name.split(' ')[0]}
+                <Avatar userId={friend.id} name={friend.name} />
+                {friend.name.split(' ')[0]}
               </button>
             ))}
           </div>
