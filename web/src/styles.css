@@ -60,9 +60,19 @@ body {
   /* A dusk sun catching the top of the frame and a fairway glow rising from
      the bottom-left — both fully transparent by the time they'd cross a card,
      so this only ever reads as depth behind the content, never as a color
-     shift on it. Layered over the flat var(--bg) fallback everywhere else. */
+     shift on it. Layered over the flat var(--bg) fallback everywhere else.
+
+     The gold ellipse still peaks near the top — that's the point of it — but
+     its radius is tight rather than broad. On iOS the status bar is opaque
+     native chrome, entirely outside this element, so however row 0 is shaded
+     is what sits flush against a hard flat black with no way to blend across
+     that seam; a broad ellipse centered right at or above row 0 put it near
+     peak brightness there, a bright edge dropped straight against black. A
+     tight one still decays to near var(--bg) by row 0, just over a few
+     percent of height instead of a quarter of the screen, so the glow ramps
+     up fast rather than snapping on, and still peaks close to the top. */
   background:
-    radial-gradient(ellipse 120% 46% at 50% -8%, rgba(232, 179, 77, 0.14), transparent 60%),
+    radial-gradient(ellipse 130% 13% at 50% 6%, rgba(232, 179, 77, 0.16), transparent 62%),
     radial-gradient(ellipse 130% 60% at 8% 112%, rgba(71, 201, 138, 0.12), transparent 62%),
     var(--bg);
 }
@@ -261,7 +271,6 @@ button:focus-visible {
 
 .brand svg,
 .hero h1 svg {
-  color: var(--gold);
   flex: none;
 }
 
