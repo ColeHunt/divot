@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import type { RoundInvite, RoundSummary, SavedCourse } from '@shared/types.js';
 import { Avatar } from '../components/Avatar.js';
+import { Wordmark } from '../components/Wordmark.js';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
 import { navigate } from '../lib/router.js';
@@ -77,12 +78,12 @@ export function Home() {
   return (
     <div className="app">
       <div className="topbar">
-        <span className="brand">⛳ Divot</span>
+        <span className="brand"><Wordmark /></span>
         {user && (
           <button
             className="btn-ghost tiny row"
             style={{ padding: 0, minHeight: 0, gap: '0.4rem' }}
-            onClick={() => navigate('/account')}
+            onClick={() => navigate('/profile')}
           >
             Hey, {user.name.split(' ')[0]}
             <Avatar userId={user.id} name={user.name} />

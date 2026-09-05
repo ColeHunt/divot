@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { messageFor, useAuth } from '../lib/auth.js';
 import { navigate } from '../lib/router.js';
+import { Wordmark } from '../components/Wordmark.js';
 
 export function ResetPassword() {
   const { resetPassword } = useAuth();
@@ -32,7 +33,7 @@ export function ResetPassword() {
     return (
       <div className="app">
         <div className="hero">
-          <h1>⛳ Divot</h1>
+          <h1><Wordmark /></h1>
         </div>
         <div className="card stack" style={{ textAlign: 'center' }}>
           <p>This link is missing its reset code.</p>
@@ -47,7 +48,7 @@ export function ResetPassword() {
   return (
     <div className="app">
       <div className="hero">
-        <h1>⛳ Divot</h1>
+        <h1><Wordmark /></h1>
         <p className="muted">Choose a new password.</p>
       </div>
 
