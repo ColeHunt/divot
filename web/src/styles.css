@@ -70,10 +70,17 @@ body {
      peak brightness there, a bright edge dropped straight against black. A
      tight one still decays to near var(--bg) by row 0, just over a few
      percent of height instead of a quarter of the screen, so the glow ramps
-     up fast rather than snapping on, and still peaks close to the top. */
+     up fast rather than snapping on, and still peaks close to the top.
+
+     course-bg.svg sits underneath both glows — a faint aerial fairway, green
+     and a couple of hazards, low-opacity enough on its own terms (see the
+     file) that it reads as texture behind the dusk lighting, not a map
+     competing with it. It only ever shows in the gaps between cards, which
+     have their own opaque background. */
   background:
     radial-gradient(ellipse 130% 13% at 50% 6%, rgba(232, 179, 77, 0.16), transparent 62%),
     radial-gradient(ellipse 130% 60% at 8% 112%, rgba(71, 201, 138, 0.12), transparent 62%),
+    url('/course-bg.svg') center / cover no-repeat,
     var(--bg);
 }
 
