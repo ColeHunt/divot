@@ -8,7 +8,11 @@
     />
     <meta name="theme-color" content="#0f1712" />
     <meta name="description" content="Track rounds, courses and scores with your friends." />
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext x='50' y='78' font-size='80' text-anchor='middle'%3E%E2%9B%B3%3C/text%3E%3C/svg%3E" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <!-- iOS reads this for "Add to Home Screen" directly rather than the web
+         manifest's icons, and won't reliably rasterize an SVG there, so this
+         is a pre-rendered PNG rather than a link to icon.svg. -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.json" />
     <!-- Fraunces for the wordmark and hero headings only — everything else stays
          the system ui-rounded font. A serif display face paired with a rounded
