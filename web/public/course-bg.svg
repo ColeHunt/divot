@@ -2,7 +2,7 @@
   <!-- Rough, filling the frame -->
   <rect width="400" height="800" fill="#16241b"/>
 
-  <g opacity="0.22">
+  <g transform="rotate(180 200 400)" opacity="0.22">
     <!-- Fairway, winding from the bottom of the screen up to the green. A thick
          stroke on a single centerline rather than a hand-filled ribbon, so its
          width is one number to tune instead of two roughly-parallel curves
