@@ -179,6 +179,18 @@ function migrate(instance: Db): void {
       PRIMARY KEY (round_id, user_id, hole_number)
     );
 
+    -- Putts are tracked the same way as strokes but are entirely optional —
+    -- a hole with no row here just has no putt count recorded, same
+    -- "presence, not a flag" idiom as the rest of this schema.
+    CREATE TABLE IF NOT EXISTS round_putts (
+      round_id    TEXT NOT NULL REFERENCES rounds(id) ON DELETE CASCADE,
+      user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      hole_number INTEGER NOT NULL,
+      putts       INTEGER NOT NULL,
+      updated_at  INTEGER NOT NULL,
+      PRIMARY KEY (round_id, user_id, hole_number)
+    );
+
     -- A scramble round's teams. 'position' keeps them in creation order for
     -- display, since "Team 1" / "Team 2" default names are not otherwise
     -- ordered by anything meaningful.
@@ -212,5 +224,16 @@ function migrate(instance: Db): void {
     );
 
     CREATE INDEX IF NOT EXISTS idx_round_team_scores_round ON round_team_scores(round_id);
+
+    CREATE TABLE IF NOT EXISTS round_team_putts (
+      round_id    TEXT NOT NULL REFERENCES rounds(id) ON DELETE CASCADE,
+      team_id     TEXT NOT NULL REFERENCES round_teams(id) ON DELETE CASCADE,
+      hole_number INTEGER NOT NULL,
+      putts       INTEGER NOT NULL,
+      updated_at  INTEGER NOT NULL,
+      PRIMARY KEY (team_id, hole_number)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_round_team_putts_round ON round_team_putts(round_id);
   `);
 }

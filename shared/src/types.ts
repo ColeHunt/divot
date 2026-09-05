@@ -65,6 +65,31 @@ export interface CourseStats {
   lastRound: LastRound | null;
 }
 
+/**
+ * A user's past strokes on one hole, split by the format they were earned
+ * under. A 'scramble' score is the whole team's shared shot, not this
+ * player's own play, so it's kept separate from genuinely personal
+ * 'stroke_play' history rather than blended into one misleading average.
+ */
+export interface HoleHistory {
+  personal: number[];
+  scramble: number[];
+}
+
+/** One past visit to a hole, for charting a trend over time. */
+export interface HoleTrendEntry {
+  playedAt: number;
+  strokes: number;
+  /** Null if putts were never entered for this hole in this round. */
+  putts: number | null;
+}
+
+/** A user's strokes-and-putts trend on one hole over time, oldest first — split the same way as HoleHistory. */
+export interface HoleTrend {
+  personal: HoleTrendEntry[];
+  scramble: HoleTrendEntry[];
+}
+
 export type RoundStatus = 'active' | 'completed';
 export type RoundPlayerStatus = 'invited' | 'joined';
 export type RoundFormat = 'stroke_play' | 'scramble';
@@ -79,6 +104,8 @@ export interface RoundPlayer {
    * scoring lives on the player's team instead, in RoundState.teams.
    */
   scores: Record<number, number>;
+  /** Hole number -> putts. Entirely optional — a hole missing here just has no putt count recorded. */
+  putts: Record<number, number>;
 }
 
 /** A scramble team. Only present on 'scramble' rounds — empty on 'stroke_play'. */
@@ -88,6 +115,8 @@ export interface RoundTeam {
   memberUserIds: string[];
   /** Hole number -> strokes, the team's shared scorecard. */
   scores: Record<number, number>;
+  /** Hole number -> putts, the team's shared putt count. Optional, same as RoundPlayer.putts. */
+  putts: Record<number, number>;
 }
 
 export interface RoundState {
@@ -132,6 +161,7 @@ export interface RoundInvite {
 export type ClientMessage =
   | { t: 'subscribe'; code: string }
   | { t: 'set_score'; code: string; hole: number; strokes: number | null }
+  | { t: 'set_putts'; code: string; hole: number; putts: number | null }
   | { t: 'complete_round'; code: string }
   | { t: 'reopen_round'; code: string }
   | { t: 'create_team'; code: string; name?: string }

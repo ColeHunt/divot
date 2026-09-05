@@ -1,19 +1,85 @@
-import { useMemo, useState } from 'react';
-import type { RoundTeam } from '@shared/types.js';
-import { formatToPar, holesPlayed, toPar, totalStrokes } from '@shared/scoring.js';
+import { useEffect, useMemo, useState } from 'react';
+import type { HoleHistory, HoleTrend, RoundTeam } from '@shared/types.js';
+import { formatToPar, holesPlayed, scoreName, toPar, totalPutts, totalStrokes } from '@shared/scoring.js';
 import { Avatar } from '../components/Avatar.js';
+import { ChartLegend, LineChart, type ChartSeries } from '../components/LineChart.js';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
 import { useRound } from '../lib/useRound.js';
 import { navigate } from '../lib/router.js';
 
-function strokeOptions(par: number): number[] {
-  const start = Math.max(1, par - 2);
-  return Array.from({ length: 6 }, (_, i) => start + i);
-}
+const MIN_STROKES = 1;
+const MAX_STROKES = 20;
+const MIN_PUTTS = 0;
+const MAX_PUTTS = 10;
+
+const STROKES_COLOR = '#47c98a';
+const PUTTS_COLOR = '#f2b134';
+const PAR_COLOR = '#6b7d72';
 
 function initials(name: string): string {
   return name[0]?.toUpperCase() ?? '?';
+}
+
+/** Green for under par, dim for even, red for over — matches the badge colors used elsewhere. */
+function scoreColor(diff: number): string {
+  if (diff < 0) return 'var(--accent)';
+  if (diff === 0) return 'var(--text-dim)';
+  return 'var(--danger)';
+}
+
+/** One row of past strokes on a hole, e.g. "Your history" or "Scramble history", with an optional link to a fuller trend chart. */
+function HistoryChips({
+  label,
+  strokes,
+  par,
+  onViewStats,
+}: {
+  label: string;
+  strokes: number[];
+  par: number;
+  onViewStats?: () => void;
+}) {
+  if (strokes.length === 0) return null;
+  return (
+    <div style={{ marginTop: '0.7rem' }}>
+      <div className="row between">
+        <div className="tiny muted">{label}</div>
+        {onViewStats && (
+          <button className="btn-ghost tiny" style={{ padding: 0, minHeight: 0 }} onClick={onViewStats}>
+            View stats
+          </button>
+        )}
+      </div>
+      <div className="chip-row" style={{ marginTop: '0.4rem' }}>
+        {strokes.map((n, i) => (
+          <span key={i} className="badge badge-muted">
+            {n} · {scoreName(n - par)}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Strokes-and-putts trend on one hole across past personal rounds, oldest first. */
+function HoleTrendChart({ trend, par, loading }: { trend: HoleTrend | null; par: number; loading: boolean }) {
+  if (loading) return <p className="tiny muted" style={{ marginTop: '0.6rem' }}>Loading…</p>;
+  if (!trend || trend.personal.length === 0) return null;
+
+  const categories = trend.personal.map((e) => new Date(e.playedAt).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' }));
+  const series: ChartSeries[] = [
+    { label: 'Strokes', color: STROKES_COLOR, values: trend.personal.map((e) => e.strokes) },
+    { label: 'Putts', color: PUTTS_COLOR, values: trend.personal.map((e) => e.putts) },
+    { label: 'Par', color: PAR_COLOR, dashed: true, values: trend.personal.map(() => par) },
+  ];
+
+  return (
+    <div style={{ marginTop: '0.8rem' }}>
+      <LineChart categories={categories} series={series} height={160} />
+      <ChartLegend series={series} />
+    </div>
+  );
 }
 
 export function Round({ code }: { code: string }) {
@@ -24,6 +90,7 @@ export function Round({ code }: { code: string }) {
     error,
     fatalError,
     setScore,
+    setPutts,
     completeRound,
     reopenRound,
     createTeam,
@@ -38,12 +105,65 @@ export function Round({ code }: { code: string }) {
   const [teamNameDraft, setTeamNameDraft] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [pending, setPending] = useState(0);
+  const [pendingPutts, setPendingPutts] = useState<number | null>(null);
+  const [holeHistory, setHoleHistory] = useState<Record<number, HoleHistory>>({});
+  const [showHoleStats, setShowHoleStats] = useState(false);
+  const [holeTrend, setHoleTrend] = useState<HoleTrend | null>(null);
+  const [loadingTrend, setLoadingTrend] = useState(false);
 
   const me = useMemo(() => round?.players.find((p) => p.userId === user?.id) ?? null, [round, user]);
   const myTeam = useMemo(
     () => round?.teams.find((t) => user && t.memberUserIds.includes(user.id)) ?? null,
     [round, user],
   );
+
+  const isScramble = round?.format === 'scramble';
+  const hole = round?.course.holes[holeIndex];
+  const myScores = (isScramble ? myTeam?.scores : me?.scores) ?? {};
+  const myPutts = (isScramble ? myTeam?.putts : me?.putts) ?? {};
+
+  // Re-baseline the steppers when navigating to a different hole, or when the
+  // *committed* value for the hole being viewed changes — our own save
+  // confirming over the websocket, or (in scramble) a teammate scoring the
+  // same shared hole. An in-progress adjustment on this hole is otherwise
+  // left alone, so it doesn't jump around mid-edit.
+  const committedForHole = hole ? myScores[hole.number] : undefined;
+  const committedPuttsForHole = hole ? myPutts[hole.number] : undefined;
+  useEffect(() => {
+    if (!hole) return;
+    setPending(committedForHole ?? hole.par);
+    setPendingPutts(committedPuttsForHole ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hole?.number, committedForHole, committedPuttsForHole]);
+
+  useEffect(() => {
+    api
+      .get<{ history: Record<number, HoleHistory> }>(`/api/rounds/${code}/hole-history`)
+      .then((res) => setHoleHistory(res.history))
+      .catch(() => {});
+  }, [code]);
+
+  // Collapse the trend chart and drop its data whenever the viewed hole changes.
+  useEffect(() => {
+    setShowHoleStats(false);
+    setHoleTrend(null);
+  }, [hole?.number]);
+
+  function toggleHoleStats() {
+    if (showHoleStats) {
+      setShowHoleStats(false);
+      return;
+    }
+    setShowHoleStats(true);
+    if (!hole || holeTrend) return;
+    setLoadingTrend(true);
+    api
+      .get<{ trend: HoleTrend }>(`/api/rounds/${code}/holes/${hole.number}/trend`)
+      .then((res) => setHoleTrend(res.trend))
+      .catch(() => {})
+      .finally(() => setLoadingTrend(false));
+  }
 
   if (fatalError) {
     return (
@@ -68,9 +188,6 @@ export function Round({ code }: { code: string }) {
     );
   }
 
-  const isScramble = round.format === 'scramble';
-  const hole = round.course.holes[holeIndex];
-  const myScores = (isScramble ? myTeam?.scores : me?.scores) ?? {};
   const isComplete = round.status === 'completed';
   const canScore = isScramble ? Boolean(myTeam) : Boolean(me);
   const isCreator = user?.id === round.createdBy;
@@ -130,7 +247,7 @@ export function Round({ code }: { code: string }) {
         </div>
       </div>
 
-      <div className="card">
+      <div className="card" style={{ padding: '0.6rem 1rem' }}>
         <div className="row between">
           <div>
             <div className="row-name">{round.course.name}</div>
@@ -223,10 +340,10 @@ export function Round({ code }: { code: string }) {
       )}
 
       {!isComplete && hole && canScore && (
-        <div className="card">
+        <div className="card scoring-card">
           <div className="hole-nav">
             <button
-              className="btn btn-sm"
+              className="btn"
               onClick={() => setHoleIndex((i) => Math.max(0, i - 1))}
               disabled={holeIndex === 0}
             >
@@ -240,7 +357,7 @@ export function Round({ code }: { code: string }) {
               </div>
             </div>
             <button
-              className="btn btn-sm"
+              className="btn"
               onClick={() => setHoleIndex((i) => Math.min(round.course.holes.length - 1, i + 1))}
               disabled={holeIndex === round.course.holes.length - 1}
             >
@@ -248,24 +365,98 @@ export function Round({ code }: { code: string }) {
             </button>
           </div>
 
-          <div className="stroke-grid">
-            {strokeOptions(hole.par).map((n) => (
-              <button
-                key={n}
-                className="stroke-btn"
-                aria-pressed={myScores[hole.number] === n}
-                onClick={() => {
-                  const next = myScores[hole.number] === n ? null : n;
-                  setScore(hole.number, next);
-                  if (next != null && holeIndex < round.course.holes.length - 1) {
-                    setHoleIndex((i) => i + 1);
-                  }
-                }}
-              >
-                {n}
-              </button>
-            ))}
+          <div className="score-stepper">
+            <button
+              className="stepper-btn"
+              aria-label="Decrease strokes"
+              onClick={() => setPending((p) => Math.max(MIN_STROKES, p - 1))}
+              disabled={pending <= MIN_STROKES}
+            >
+              −
+            </button>
+            <div className="stepper-value">
+              <div className="stepper-number">{pending}</div>
+              <div className="stepper-label" style={{ color: scoreColor(pending - hole.par) }}>
+                {scoreName(pending - hole.par)}
+              </div>
+            </div>
+            <button
+              className="stepper-btn"
+              aria-label="Increase strokes"
+              onClick={() => setPending((p) => Math.min(MAX_STROKES, p + 1))}
+              disabled={pending >= MAX_STROKES}
+            >
+              +
+            </button>
           </div>
+
+          <div className="putts-row">
+            <span className="tiny muted">Putts</span>
+            <button
+              className="mini-stepper-btn"
+              aria-label="Decrease putts"
+              onClick={() => setPendingPutts((p) => (p == null ? null : Math.max(MIN_PUTTS, p - 1)))}
+              disabled={pendingPutts == null || pendingPutts <= MIN_PUTTS}
+            >
+              −
+            </button>
+            <span className="putts-value">{pendingPutts ?? '–'}</span>
+            <button
+              className="mini-stepper-btn"
+              aria-label="Increase putts"
+              onClick={() => setPendingPutts((p) => Math.min(MAX_PUTTS, (p ?? 0) + 1))}
+              disabled={pendingPutts != null && pendingPutts >= MAX_PUTTS}
+            >
+              +
+            </button>
+            {pendingPutts != null && (
+              <button
+                className="btn-ghost tiny"
+                style={{ padding: 0, minHeight: 0 }}
+                onClick={() => setPendingPutts(null)}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          <button
+            className="btn btn-primary btn-full btn-lg"
+            style={{ marginTop: '1rem' }}
+            onClick={() => {
+              setScore(hole.number, pending);
+              setPutts(hole.number, pendingPutts);
+              if (holeIndex < round.course.holes.length - 1) setHoleIndex((i) => i + 1);
+            }}
+          >
+            Save score
+          </button>
+
+          {myScores[hole.number] != null && (
+            <button
+              className="btn-ghost tiny"
+              style={{ display: 'block', margin: '0.6rem auto 0', padding: 0, minHeight: 0 }}
+              onClick={() => {
+                setScore(hole.number, null);
+                setPending(hole.par);
+              }}
+            >
+              Clear score
+            </button>
+          )}
+
+          <HistoryChips
+            label="Your history on this hole"
+            strokes={holeHistory[hole.number]?.personal ?? []}
+            par={hole.par}
+            onViewStats={toggleHoleStats}
+          />
+          {showHoleStats && <HoleTrendChart trend={holeTrend} par={hole.par} loading={loadingTrend} />}
+          <HistoryChips
+            label="Scramble history on this hole"
+            strokes={holeHistory[hole.number]?.scramble ?? []}
+            par={hole.par}
+          />
         </div>
       )}
 
@@ -280,6 +471,7 @@ export function Round({ code }: { code: string }) {
                   <div className="row-name">{team.name}</div>
                   <div className="row-meta">
                     {team.memberUserIds.map(nameFor).join(', ')} · {holesPlayed(team.scores)}/{round.course.holeCount} holes
+                    {holesPlayed(team.putts) > 0 ? ` · ${totalPutts(team.putts)} putts` : ''}
                   </div>
                 </div>
                 <div>
@@ -304,6 +496,7 @@ export function Round({ code }: { code: string }) {
                   <div className="row-name">{player.name}</div>
                   <div className="row-meta">
                     {holesPlayed(player.scores)}/{round.course.holeCount} holes
+                    {holesPlayed(player.putts) > 0 ? ` · ${totalPutts(player.putts)} putts` : ''}
                   </div>
                 </div>
                 <div>

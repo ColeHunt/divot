@@ -8,6 +8,7 @@ export interface RoundView {
   error: string | null;
   fatalError: string | null;
   setScore: (hole: number, strokes: number | null) => void;
+  setPutts: (hole: number, putts: number | null) => void;
   completeRound: () => void;
   reopenRound: () => void;
   createTeam: (name?: string) => void;
@@ -58,6 +59,10 @@ export function useRound(code: string): RoundView {
     socketRef.current?.send({ t: 'set_score', code, hole, strokes });
   }, [code]);
 
+  const setPutts = useCallback((hole: number, putts: number | null) => {
+    socketRef.current?.send({ t: 'set_putts', code, hole, putts });
+  }, [code]);
+
   const completeRound = useCallback(() => {
     socketRef.current?.send({ t: 'complete_round', code });
   }, [code]);
@@ -96,6 +101,7 @@ export function useRound(code: string): RoundView {
     error,
     fatalError,
     setScore,
+    setPutts,
     completeRound,
     reopenRound,
     createTeam,

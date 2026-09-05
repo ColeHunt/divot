@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { openDb, setDb } from '../src/db.js';
 import { register } from '../src/users.js';
-import { completeRound, createRound, setScore } from '../src/rounds.js';
+import { completeRound, createRound, setPutts, setScore } from '../src/rounds.js';
 import {
   CourseError,
   createCourse,
   deleteCourse,
   getCourseStats,
+  getHoleHistory,
+  getHoleTrend,
   getLastRound,
   isSaved,
   listSavedCourses,
@@ -181,6 +183,161 @@ describe('getCourseStats', () => {
     const { code } = createRound(alice, { courseId: course.id });
     setScore(code, alice, 1, 4);
     expect(getCourseStats(alice, course.id)).toEqual({ roundsPlayed: 0, bestRound: null, lastRound: null });
+  });
+});
+
+describe('getHoleHistory', () => {
+  it('is empty with no completed rounds', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [
+      { number: 1, par: 4 },
+      { number: 2, par: 3 },
+    ]);
+    expect(getHoleHistory(alice, course.id)).toEqual({});
+  });
+
+  it('collects past strokes per hole, most recent round first', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [
+      { number: 1, par: 4 },
+      { number: 2, par: 3 },
+    ]);
+
+    const first = createRound(alice, { courseId: course.id }, 1000);
+    setScore(first.code, alice, 1, 5, 1000);
+    setScore(first.code, alice, 2, 3, 1000);
+    completeRound(first.code, alice, 2000);
+
+    const second = createRound(alice, { courseId: course.id }, 3000);
+    setScore(second.code, alice, 1, 4, 3000);
+    completeRound(second.code, alice, 4000);
+
+    expect(getHoleHistory(alice, course.id)).toEqual({
+      1: { personal: [4, 5], scramble: [] },
+      2: { personal: [3], scramble: [] },
+    });
+  });
+
+  it('excludes the given round id, e.g. the one currently being played', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [{ number: 1, par: 4 }]);
+
+    const past = createRound(alice, { courseId: course.id }, 1000);
+    setScore(past.code, alice, 1, 5, 1000);
+    completeRound(past.code, alice, 2000);
+
+    const current = createRound(alice, { courseId: course.id }, 3000);
+    setScore(current.code, alice, 1, 3, 3000);
+
+    expect(getHoleHistory(alice, course.id, current.id)).toEqual({
+      1: { personal: [5], scramble: [] },
+    });
+  });
+
+  it('caps history per hole at 5 entries', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [{ number: 1, par: 4 }]);
+    for (let i = 0; i < 7; i += 1) {
+      const round = createRound(alice, { courseId: course.id }, 1000 + i);
+      setScore(round.code, alice, 1, 4, 1000 + i);
+      completeRound(round.code, alice, 1000 + i);
+    }
+    expect(getHoleHistory(alice, course.id)[1]!.personal).toHaveLength(5);
+  });
+
+  it('only counts completed rounds', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [{ number: 1, par: 4 }]);
+    const { code } = createRound(alice, { courseId: course.id });
+    setScore(code, alice, 1, 4);
+    expect(getHoleHistory(alice, course.id)).toEqual({});
+  });
+
+  it('resolves through a team scorecard for a past scramble round, kept separate from personal history', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [
+      { number: 1, par: 4 },
+      { number: 2, par: 3 },
+    ]);
+
+    const solo = createRound(alice, { courseId: course.id }, 1000);
+    setScore(solo.code, alice, 1, 6, 1000);
+    completeRound(solo.code, alice, 2000);
+
+    const scramble = createRound(alice, { courseId: course.id, format: 'scramble' }, 3000);
+    setScore(scramble.code, alice, 1, 5, 3000);
+    setScore(scramble.code, alice, 2, 4, 3000);
+    completeRound(scramble.code, alice, 4000);
+
+    expect(getHoleHistory(alice, course.id)).toEqual({
+      1: { personal: [6], scramble: [5] },
+      2: { personal: [], scramble: [4] },
+    });
+  });
+});
+
+describe('getHoleTrend', () => {
+  it('is empty with no completed rounds', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [{ number: 1, par: 4 }]);
+    expect(getHoleTrend(alice, course.id, 1)).toEqual({ personal: [], scramble: [] });
+  });
+
+  it('orders entries oldest first, with strokes and putts', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [{ number: 1, par: 4 }]);
+
+    const first = createRound(alice, { courseId: course.id }, 1000);
+    setScore(first.code, alice, 1, 5, 1000);
+    setPutts(first.code, alice, 1, 2, 1000);
+    completeRound(first.code, alice, 2000);
+
+    const second = createRound(alice, { courseId: course.id }, 3000);
+    setScore(second.code, alice, 1, 4, 3000);
+    completeRound(second.code, alice, 4000);
+
+    const trend = getHoleTrend(alice, course.id, 1);
+    expect(trend.personal).toEqual([
+      { playedAt: 2000, strokes: 5, putts: 2 },
+      { playedAt: 4000, strokes: 4, putts: null },
+    ]);
+    expect(trend.scramble).toEqual([]);
+  });
+
+  it('excludes the given round id, e.g. the one currently being played', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [{ number: 1, par: 4 }]);
+
+    const past = createRound(alice, { courseId: course.id }, 1000);
+    setScore(past.code, alice, 1, 5, 1000);
+    completeRound(past.code, alice, 2000);
+
+    const current = createRound(alice, { courseId: course.id }, 3000);
+    setScore(current.code, alice, 1, 3, 3000);
+
+    expect(getHoleTrend(alice, course.id, 1, current.id).personal).toEqual([
+      { playedAt: 2000, strokes: 5, putts: null },
+    ]);
+  });
+
+  it('resolves through a team scorecard for a past scramble round, kept separate from personal', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [{ number: 1, par: 4 }]);
+
+    const solo = createRound(alice, { courseId: course.id }, 1000);
+    setScore(solo.code, alice, 1, 6, 1000);
+    completeRound(solo.code, alice, 2000);
+
+    const scramble = createRound(alice, { courseId: course.id, format: 'scramble' }, 3000);
+    setScore(scramble.code, alice, 1, 5, 3000);
+    setPutts(scramble.code, alice, 1, 1, 3000);
+    completeRound(scramble.code, alice, 4000);
+
+    const trend = getHoleTrend(alice, course.id, 1);
+    expect(trend.personal).toEqual([{ playedAt: 2000, strokes: 6, putts: null }]);
+    expect(trend.scramble).toEqual([{ playedAt: 4000, strokes: 5, putts: 1 }]);
+  });
+
+  it('skips a round that never scored this hole', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [
+      { number: 1, par: 4 },
+      { number: 2, par: 3 },
+    ]);
+    const { code } = createRound(alice, { courseId: course.id });
+    setScore(code, alice, 2, 4);
+    completeRound(code, alice);
+
+    expect(getHoleTrend(alice, course.id, 1)).toEqual({ personal: [], scramble: [] });
   });
 });
 

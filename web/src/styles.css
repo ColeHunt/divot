@@ -135,6 +135,12 @@ button:focus-visible {
   font-size: 0.85rem;
 }
 
+.btn-lg {
+  padding: 1.1rem;
+  min-height: 64px;
+  font-size: 1.2rem;
+}
+
 .row {
   display: flex;
   align-items: center;
@@ -387,45 +393,101 @@ button:focus-visible {
   background: var(--surface);
 }
 
+/* The scoring card is the reason someone opens a round mid-play, so it gets
+   the bulk of the screen — everything else (leaderboard, finish/delete) is
+   one scroll away rather than competing for the same fold. */
+.scoring-card {
+  min-height: 62vh;
+  padding: 1.5rem 1.25rem 1.75rem;
+}
+
 .hole-nav {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: 1.5rem;
 }
 
 .hole-num {
-  font-size: 1.6rem;
+  font-size: 2.6rem;
   font-weight: 800;
   letter-spacing: -0.02em;
 }
 
 .hole-meta {
-  font-size: 0.8rem;
+  font-size: 1rem;
   color: var(--text-dim);
+  margin-top: 0.15rem;
 }
 
-.stroke-grid {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 0.5rem;
+.score-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  margin: 1.5rem 0 2rem;
 }
 
-.stroke-btn {
-  padding: 0.9rem 0;
-  border-radius: 12px;
+.stepper-btn {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
   background: var(--surface-2);
   border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 2.1rem;
   font-weight: 700;
-  font-size: 1.1rem;
-  min-height: 52px;
+  line-height: 1;
+  flex: none;
 }
 
-.stroke-btn[aria-pressed='true'] {
-  background: var(--accent);
-  color: var(--accent-ink);
-  border-color: transparent;
+.stepper-value {
+  min-width: 120px;
+  text-align: center;
+}
+
+.stepper-number {
+  font-size: 4.2rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.stepper-label {
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 0.4rem;
+}
+
+.putts-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+}
+
+.mini-stepper-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1;
+  flex: none;
+}
+
+.putts-value {
+  min-width: 22px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 1.05rem;
 }
 
 .player-score-row {

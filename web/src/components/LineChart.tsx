@@ -36,6 +36,23 @@ function segments(values: (number | null)[]): Array<Array<{ i: number; v: number
   return runs;
 }
 
+/** A legend row matching a chart's series — solid/dashed swatch plus label. */
+export function ChartLegend({ series }: { series: ChartSeries[] }) {
+  return (
+    <div className="chart-legend">
+      {series.map((s) => (
+        <div key={s.label} className="chart-legend-item">
+          <span
+            className="chart-legend-swatch"
+            style={{ borderTopColor: s.color, borderTopStyle: s.dashed ? 'dashed' : 'solid' }}
+          />
+          {s.label}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** A small dependency-free SVG line chart — this app has no charting library, and the data here is tiny (one point per hole). */
 export function LineChart({ categories, series, height = 200, zeroLine = false }: LineChartProps) {
   const plotWidth = WIDTH - PAD_LEFT - PAD_RIGHT;

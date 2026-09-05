@@ -10,6 +10,8 @@ import {
   createTeam,
   declineRound,
   deleteRound,
+  getHoleHistoryForRound,
+  getHoleTrendForRound,
   getRoundState,
   joinRound,
   joinTeam,
@@ -19,6 +21,7 @@ import {
   renameTeam,
   reopenRound,
   roundExists,
+  setPutts,
   setScore,
 } from '../src/rounds.js';
 import { isValidRoundCode } from '../src/ids.js';
@@ -159,6 +162,55 @@ describe('setScore (stroke play)', () => {
   });
 });
 
+describe('setPutts (stroke play)', () => {
+  it("records and updates a player's putts for a hole, independent of strokes", () => {
+    const { code } = startRound(alice);
+    setScore(code, alice, 1, 5);
+    setPutts(code, alice, 1, 2);
+    const state = getRoundState(code);
+    expect(state.players[0]!.scores).toEqual({ 1: 5 });
+    expect(state.players[0]!.putts).toEqual({ 1: 2 });
+
+    setPutts(code, alice, 1, 3);
+    expect(getRoundState(code).players[0]!.putts).toEqual({ 1: 3 });
+  });
+
+  it('clears a putt count when given null', () => {
+    const { code } = startRound(alice);
+    setPutts(code, alice, 1, 2);
+    setPutts(code, alice, 1, null);
+    expect(getRoundState(code).players[0]!.putts).toEqual({});
+  });
+
+  it('allows zero putts (a chip-in)', () => {
+    const { code } = startRound(alice);
+    expect(() => setPutts(code, alice, 1, 0)).not.toThrow();
+    expect(getRoundState(code).players[0]!.putts).toEqual({ 1: 0 });
+  });
+
+  it('rejects a non-player', () => {
+    const { code } = startRound(alice);
+    expect(() => setPutts(code, cara, 1, 2)).toThrow(RoundError);
+  });
+
+  it('rejects a hole not on the course', () => {
+    const { code } = startRound(alice);
+    expect(() => setPutts(code, alice, 99, 2)).toThrow(RoundError);
+  });
+
+  it('rejects an out-of-range putt count', () => {
+    const { code } = startRound(alice);
+    expect(() => setPutts(code, alice, 1, -1)).toThrow(RoundError);
+    expect(() => setPutts(code, alice, 1, 11)).toThrow(RoundError);
+  });
+
+  it('rejects putts after the round is completed', () => {
+    const { code } = startRound(alice);
+    completeRound(code, alice);
+    expect(() => setPutts(code, alice, 1, 2)).toThrow(RoundError);
+  });
+});
+
 describe('completeRound / reopenRound', () => {
   it('moves a round from active to completed and shows up in "mine"', () => {
     const { code } = startRound(alice);
@@ -242,6 +294,23 @@ describe('scramble rounds', () => {
     expect(state.teams[0]!.scores).toEqual({ 1: 3 });
   });
 
+  it('putts also apply to the whole team', () => {
+    const { code } = startRound(alice, {
+      format: 'scramble',
+      inviteFriendIds: [bob],
+      teams: [{ memberIds: [alice, bob] }],
+    });
+    joinRound(code, bob);
+    setPutts(code, alice, 1, 2);
+    let state = getRoundState(code);
+    expect(state.teams[0]!.putts).toEqual({ 1: 2 });
+    expect(state.players.every((p) => Object.keys(p.putts).length === 0)).toBe(true);
+
+    setPutts(code, bob, 1, 1);
+    state = getRoundState(code);
+    expect(state.teams[0]!.putts).toEqual({ 1: 1 });
+  });
+
   it('rejects scoring from a player not on any team', () => {
     const { code } = startRound(alice, {
       format: 'scramble',
@@ -250,6 +319,16 @@ describe('scramble rounds', () => {
     });
     joinRound(code, dave);
     expect(() => setScore(code, dave, 1, 4)).toThrow(RoundError);
+  });
+
+  it('rejects putts from a player not on any team', () => {
+    const { code } = startRound(alice, {
+      format: 'scramble',
+      inviteFriendIds: [bob, dave],
+      teams: [{ memberIds: [alice, bob] }],
+    });
+    joinRound(code, dave);
+    expect(() => setPutts(code, dave, 1, 2)).toThrow(RoundError);
   });
 
   it('rejects team actions on a stroke_play round', () => {
@@ -423,5 +502,45 @@ describe('deleteRound', () => {
     deleteRound(code, alice);
     const mine = listMyRounds(alice);
     expect(mine.active.some((r) => r.code === code)).toBe(false);
+  });
+});
+
+describe('getHoleHistoryForRound', () => {
+  it('shows past strokes on this course, excluding the round being played now', () => {
+    const past = startRound(alice);
+    setScore(past.code, alice, 1, 5);
+    completeRound(past.code, alice);
+
+    const current = startRound(alice);
+    setScore(current.code, alice, 1, 3);
+
+    expect(getHoleHistoryForRound(current.code, alice)).toEqual({
+      1: { personal: [5], scramble: [] },
+    });
+  });
+
+  it('rejects an unknown code', () => {
+    expect(() => getHoleHistoryForRound('ZZZZZZ', alice)).toThrow(RoundError);
+  });
+});
+
+describe('getHoleTrendForRound', () => {
+  it('shows past strokes and putts on this hole, oldest first, excluding the round being played now', () => {
+    const past = startRound(alice);
+    setScore(past.code, alice, 1, 5);
+    setPutts(past.code, alice, 1, 2);
+    completeRound(past.code, alice);
+
+    const current = startRound(alice);
+    setScore(current.code, alice, 1, 3);
+
+    const trend = getHoleTrendForRound(current.code, alice, 1);
+    expect(trend.scramble).toEqual([]);
+    expect(trend.personal).toHaveLength(1);
+    expect(trend.personal[0]).toMatchObject({ strokes: 5, putts: 2 });
+  });
+
+  it('rejects an unknown code', () => {
+    expect(() => getHoleTrendForRound('ZZZZZZ', alice, 1)).toThrow(RoundError);
   });
 });

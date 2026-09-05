@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { coursePar, formatToPar, holesPlayed, toPar, totalStrokes } from '../src/scoring.js';
+import { coursePar, formatToPar, holesPlayed, scoreName, toPar, totalPutts, totalStrokes } from '../src/scoring.js';
 import type { Hole } from '../src/types.js';
 
 const HOLES: Hole[] = [
@@ -12,6 +12,13 @@ describe('totalStrokes', () => {
   it('sums only entered holes', () => {
     expect(totalStrokes({ 1: 5, 2: 3 })).toBe(8);
     expect(totalStrokes({})).toBe(0);
+  });
+});
+
+describe('totalPutts', () => {
+  it('sums only entered holes, including a recorded zero', () => {
+    expect(totalPutts({ 1: 2, 2: 0, 3: 1 })).toBe(3);
+    expect(totalPutts({})).toBe(0);
   });
 });
 
@@ -43,5 +50,22 @@ describe('formatToPar', () => {
 describe('coursePar', () => {
   it('sums every hole', () => {
     expect(coursePar(HOLES)).toBe(12);
+  });
+});
+
+describe('scoreName', () => {
+  it('names the standard scores around par', () => {
+    expect(scoreName(-3)).toBe('Albatross');
+    expect(scoreName(-2)).toBe('Eagle');
+    expect(scoreName(-1)).toBe('Birdie');
+    expect(scoreName(0)).toBe('Par');
+    expect(scoreName(1)).toBe('Bogey');
+    expect(scoreName(2)).toBe('Double Bogey');
+    expect(scoreName(3)).toBe('Triple Bogey');
+  });
+
+  it('falls back to a plain over/under label beyond the named range', () => {
+    expect(scoreName(4)).toBe('4 Over');
+    expect(scoreName(-4)).toBe('4 Under');
   });
 });

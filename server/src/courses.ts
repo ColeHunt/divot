@@ -1,9 +1,18 @@
 import { config } from './config.js';
 import { getDb } from './db.js';
 import { generateId } from './ids.js';
-import { scoresForRoundUser } from './scores.js';
+import { puttsForRoundUser, scoresForRoundUser } from './scores.js';
 import { totalStrokes, toPar } from '../../shared/src/scoring.js';
-import type { Course, CourseStats, CourseSummary, Hole, LastRound, SavedCourse } from '../../shared/src/types.js';
+import type {
+  Course,
+  CourseStats,
+  CourseSummary,
+  Hole,
+  HoleHistory,
+  HoleTrend,
+  LastRound,
+  SavedCourse,
+} from '../../shared/src/types.js';
 
 export class CourseError extends Error {
   constructor(readonly code: 'not_found' | 'bad_request' | 'has_rounds', message: string) {
@@ -328,4 +337,90 @@ export function getCourseStats(userId: string, courseId: string): CourseStats {
     .reduce<LastRound | null>((best, s) => (!best || s.totalStrokes < best.totalStrokes ? s : best), null);
 
   return { roundsPlayed: stats.length, bestRound, lastRound };
+}
+
+const MAX_ROUNDS_FOR_HOLE_HISTORY = 20;
+const MAX_HISTORY_PER_HOLE = 5;
+
+/**
+ * A user's past strokes on each hole of a course, most recent round first
+ * and capped per hole — a quick "how have I done here before" while scoring
+ * that hole live. `excludeRoundId` leaves out the round being played right
+ * now, so it never shows a score back to the person who just entered it.
+ *
+ * Split into `personal` (stroke_play — genuinely their own play) and
+ * `scramble` (a shared team result) buckets, each capped independently, so
+ * a team's best-ball score never gets averaged in with the player's own.
+ */
+export function getHoleHistory(
+  userId: string,
+  courseId: string,
+  excludeRoundId?: string,
+): Record<number, HoleHistory> {
+  const db = getDb();
+  const rounds = db
+    .prepare(
+      `SELECT r.id, r.format, r.completed_at
+       FROM rounds r
+       JOIN round_players p ON p.round_id = r.id
+       WHERE r.course_id = ? AND p.user_id = ? AND r.status = 'completed' AND r.id != ?
+       ORDER BY r.completed_at DESC LIMIT ?`,
+    )
+    .all(courseId, userId, excludeRoundId ?? '', MAX_ROUNDS_FOR_HOLE_HISTORY) as Array<{
+    id: string;
+    format: string;
+    completed_at: number;
+  }>;
+
+  const history: Record<number, HoleHistory> = {};
+  for (const round of rounds) {
+    const scores = scoresForRoundUser(round.id, userId);
+    const bucket = round.format === 'scramble' ? 'scramble' : 'personal';
+    for (const [holeNumberStr, strokes] of Object.entries(scores)) {
+      const holeNumber = Number(holeNumberStr);
+      const forHole = (history[holeNumber] ??= { personal: [], scramble: [] });
+      if (forHole[bucket].length < MAX_HISTORY_PER_HOLE) forHole[bucket].push(strokes);
+    }
+  }
+  return history;
+}
+
+const MAX_ROUNDS_FOR_HOLE_TREND = 20;
+
+/**
+ * Strokes and putts on one specific hole across a user's past completed
+ * rounds, oldest first — the data behind a "how have I trended on this
+ * hole" chart. Same personal/scramble split as getHoleHistory, and the
+ * same excludeRoundId behavior.
+ */
+export function getHoleTrend(
+  userId: string,
+  courseId: string,
+  holeNumber: number,
+  excludeRoundId?: string,
+): HoleTrend {
+  const db = getDb();
+  const rounds = db
+    .prepare(
+      `SELECT r.id, r.format, r.completed_at
+       FROM rounds r
+       JOIN round_players p ON p.round_id = r.id
+       WHERE r.course_id = ? AND p.user_id = ? AND r.status = 'completed' AND r.id != ?
+       ORDER BY r.completed_at DESC LIMIT ?`,
+    )
+    .all(courseId, userId, excludeRoundId ?? '', MAX_ROUNDS_FOR_HOLE_TREND) as Array<{
+    id: string;
+    format: string;
+    completed_at: number;
+  }>;
+
+  const trend: HoleTrend = { personal: [], scramble: [] };
+  for (const round of rounds.reverse()) {
+    const strokes = scoresForRoundUser(round.id, userId)[holeNumber];
+    if (strokes == null) continue;
+    const putts = puttsForRoundUser(round.id, userId)[holeNumber] ?? null;
+    const bucket = round.format === 'scramble' ? 'scramble' : 'personal';
+    trend[bucket].push({ playedAt: round.completed_at, strokes, putts });
+  }
+  return trend;
 }
