@@ -11,7 +11,15 @@
   --ok: #47c98a;
   --radius: 14px;
   --safe-top: env(safe-area-inset-top, 0px);
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  /* Capped at 34px — the documented home-indicator height on every current
+     iPhone — rather than trusting env() outright. Some browser contexts
+     (observed: reserved space well beyond the icon row itself, worse than
+     before the tabbar padding was already bumped once for this) report a
+     larger inset than the real hardware safe area, and there is no
+     legitimate reason our own reserve should ever need to exceed the
+     standard value. min() only ever pulls an inflated value back down to
+     34px; a device that genuinely reports less (or 0) is unaffected. */
+  --safe-bottom: min(env(safe-area-inset-bottom, 0px), 34px);
   color-scheme: dark;
 }
 
