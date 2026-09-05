@@ -76,7 +76,7 @@ function HoleTrendChart({ trend, par, loading }: { trend: HoleTrend | null; par:
 
   return (
     <div style={{ marginTop: '0.8rem' }}>
-      <LineChart categories={categories} series={series} height={160} />
+      <LineChart categories={categories} series={series} height={160} minZero />
       <ChartLegend series={series} />
     </div>
   );

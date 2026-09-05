@@ -174,7 +174,7 @@ export function CourseDetail({ id }: { id: string }) {
 
           <div className="card">
             <h2>Cumulative strokes</h2>
-            <LineChart categories={categories} series={strokesSeries} />
+            <LineChart categories={categories} series={strokesSeries} minZero />
             <ChartLegend series={strokesSeries} />
           </div>
 
