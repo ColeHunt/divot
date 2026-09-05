@@ -2,8 +2,8 @@
  * Hand-drawn line icons for the avatar edit badge, and the small two-tone
  * mark used in the wordmark. The wordmark icon deliberately doesn't share
  * the line-icon style below it: it's a shrunk-down echo of the app icon's
- * flying turf chunk (same green-over-soil tile, same tilt), not a glyph, so
- * it carries its own fixed colors instead of taking one from currentColor.
+ * club-and-turf scene, not a glyph, so it carries its own fixed colors
+ * instead of taking one from currentColor.
  */
 import type { SVGProps } from 'react';
 
@@ -24,13 +24,15 @@ function Icon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-/** The wordmark's mark: the same flying turf chunk as the app icon, echoed at glyph size. */
+/** The wordmark's mark: the app icon's club and flying turf chunk, echoed at glyph size. */
 export function DivotChunkIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" {...props}>
-      <g transform="rotate(-12 12 12)">
-        <rect x="5" y="8" width="14" height="9" rx="2" fill="#2a1c12" />
-        <rect x="5" y="8" width="14" height="4" rx="2" fill="#47c98a" />
+      <path d="M20 3 12 13" stroke="#cfd8d2" strokeWidth={2.1} strokeLinecap="round" fill="none" />
+      <path d="M11 12.5 17 14.5 17.8 18.5 10.8 19.5Z" fill="#dfe6e1" stroke="#9aa39c" strokeWidth={1} />
+      <g transform="rotate(-16 6 10)">
+        <rect x="1.5" y="8" width="9" height="6" rx="1.5" fill="#2a1c12" />
+        <rect x="1.5" y="8" width="9" height="2.6" rx="1.5" fill="#47c98a" />
       </g>
     </svg>
   );
