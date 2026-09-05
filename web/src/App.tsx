@@ -72,8 +72,24 @@ function Shell() {
   );
 }
 
+/**
+ * `?vp=1` works from a browser tab, but a standalone home-screen app always
+ * launches at manifest.json's fixed start_url — there's no address bar to
+ * add a query string to. Home's wordmark long-press (see Home.tsx) sets this
+ * localStorage flag instead, so the overlay can still be reached from the
+ * installed app itself.
+ */
+function viewportDebugRequested(): boolean {
+  if (new URLSearchParams(window.location.search).has('vp')) return true;
+  try {
+    return localStorage.getItem('vp-debug') === '1';
+  } catch {
+    return false;
+  }
+}
+
 export function App() {
-  const debugViewport = new URLSearchParams(window.location.search).has('vp');
+  const debugViewport = viewportDebugRequested();
   return (
     <AuthProvider>
       <Shell />
