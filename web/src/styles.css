@@ -29,15 +29,14 @@ body {
    The document itself never scrolls, so there's no rubber-band state that can
    leave the bar detached from the bottom edge.
 
-   `inset: 0` resolves against the *layout viewport*, which in a standalone
-   home-screen app on iOS is not always the whole web view: WebKit lays the
-   page out for the inset frame on the first paint and only re-syncs to the
-   real frame after the first scroll gesture. Until then the shell — and so
-   the tab bar at its end — stops short of the physical bottom of the screen,
-   and no element in the document can reach past it. What shows through in
-   that strip is the document canvas, whose colour propagates up from <body>,
-   so that (and only that) is what makes the strip visible or invisible. See
-   the body rules below. */
+   `inset: 0` resolves against the *layout viewport*, which is not the whole
+   web view: without viewport-fit=cover it is the safe area, so on a device
+   with a home indicator the shell — and the tab bar at its end — stops a
+   little short of the physical bottom of the screen, by design. No element
+   in the document can reach past that edge. What shows through there is the
+   document canvas, whose colour propagates up from <body>, so that (and only
+   that) is what makes the strip read as part of the app or as a gap under
+   it. See the body rules below. */
 #root {
   position: fixed;
   inset: 0;
@@ -48,11 +47,12 @@ body {
 
 /* The canvas colour, not a background anyone sees behind content: #root paints
    var(--bg) over the entire layout viewport, so this only ever shows in the
-   strip below the shell described above. Left as var(--bg) it reads as a gap
-   under the tab bar; matched to the tab bar's own surface (see
+   safe-area strip below the shell described above. Left as var(--bg) it reads
+   as a gap under the tab bar; matched to the tab bar's own surface (see
    body.has-tabbar) it reads as the bar running to the bottom edge, which is
-   what it is. Screens with no tab bar keep var(--bg) so the strip continues
-   the page instead. */
+   what it is — and it doubles as the home-indicator reserve, which is why
+   .tabbar needs no padding of its own. Screens with no tab bar keep var(--bg)
+   so the strip continues the page instead. */
 body {
   margin: 0;
   background: var(--bg);
@@ -248,15 +248,19 @@ button:focus-visible {
 
 /* Static, not fixed: it's the last row of the #root flex column, so it sits
    against the bottom of the shell by layout rather than by resolving
-   `bottom: 0` against a viewport rect. padding-bottom keeps the home
-   indicator clear of the tap targets. */
+   `bottom: 0` against a viewport rect.
+
+   No bottom reserve for the home indicator here. Without viewport-fit=cover
+   the layout viewport already stops above it, and the strip it leaves is
+   painted by the canvas in this same surface colour, so the bar reads as
+   running to the bottom edge with nothing drawn under the indicator.
+   Reserving that space again in CSS is what made the bar 150pt tall. */
 .tabbar {
   flex: none;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   background: var(--surface);
   border-top: 1px solid var(--border);
-  padding-bottom: var(--safe-bottom);
 }
 
 .tabbar button {
@@ -264,13 +268,11 @@ button:focus-visible {
   flex-direction: column;
   align-items: center;
   gap: 0.15rem;
-  /* A bit more than a plain 0.6rem — on a home-indicator device the fixed
-     ~34px safe-area reserve below (padding-bottom: var(--safe-bottom) on
-     .tabbar, not this) reads as an oddly tall dead strip when the icon row
-     above it is too short; this gives that row more visual weight so the
-     reserved strip looks proportionate rather than dominant. Not something
-     to fix by shrinking the safe-area reserve itself — that space is real,
-     needed so the home-indicator swipe gesture doesn't land on a tab. */
+  /* A bit more than a plain 0.6rem — the home-indicator strip below the bar
+     reads as an oddly tall dead band when the icon row above it is too short;
+     this gives that row enough visual weight to look proportionate against
+     it. Not something to fix by encroaching on the strip — that space is
+     real, so the home-indicator swipe doesn't land on a tab. */
   padding: 0.75rem 0.25rem;
   font-size: 0.68rem;
   color: var(--text-dim);
