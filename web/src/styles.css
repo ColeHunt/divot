@@ -27,15 +27,14 @@
   box-sizing: border-box;
 }
 
-/* 100dvh (dynamic viewport height) instead of the old 100% -> 100vh chain —
-   on iOS standalone home-screen apps, a plain 100%-based height can lock in
-   against a stale/larger viewport reference at load, leaving true page
-   content shorter than the screen and stranding a gap between the fixed
-   .tabbar and the real bottom edge until something (e.g. a scroll) forces
-   a layout recalculation. dvh tracks the actual visible viewport directly,
-   so it doesn't need that recalculation to begin with. */
+/* --app-height is set in main.tsx from window.visualViewport, which is a
+   more forceful fix than the dvh unit alone: on this device/iOS
+   combination, 100dvh's very first computed value was still stale on
+   load (only correcting itself once a scroll forced a recalculation),
+   leaving a gap between the fixed .tabbar and the real bottom edge until
+   then. 100dvh stays as the fallback for the instant before that JS runs. */
 html {
-  height: 100dvh;
+  height: var(--app-height, 100dvh);
 }
 
 body,
