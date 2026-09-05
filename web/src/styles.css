@@ -62,17 +62,17 @@ body {
      so this only ever reads as depth behind the content, never as a color
      shift on it. Layered over the flat var(--bg) fallback everywhere else.
 
-     The gold ellipse's center sits well *below* row 0, not just above it: in
-     an iOS standalone app the status bar is opaque native chrome, entirely
-     outside this element, so however we shade row 0 here is what sits flush
-     against a hard flat black with no way to blend across that seam. Centering
-     the glow near the top (or above it) put it near peak brightness at row 0
-     — a bright edge dropped right against flat black, reading as a hard stop
-     instead of a glow. Pushed down, row 0 lands in the gradient's faint tail
-     instead, so the page starts close to var(--bg) and only warms up a little
-     further down, in the middle of the content itself. */
+     The gold ellipse still peaks near the top — that's the point of it — but
+     its radius is tight rather than broad. On iOS the status bar is opaque
+     native chrome, entirely outside this element, so however row 0 is shaded
+     is what sits flush against a hard flat black with no way to blend across
+     that seam; a broad ellipse centered right at or above row 0 put it near
+     peak brightness there, a bright edge dropped straight against black. A
+     tight one still decays to near var(--bg) by row 0, just over a few
+     percent of height instead of a quarter of the screen, so the glow ramps
+     up fast rather than snapping on, and still peaks close to the top. */
   background:
-    radial-gradient(ellipse 130% 55% at 50% 26%, rgba(232, 179, 77, 0.13), transparent 60%),
+    radial-gradient(ellipse 130% 13% at 50% 6%, rgba(232, 179, 77, 0.16), transparent 62%),
     radial-gradient(ellipse 130% 60% at 8% 112%, rgba(71, 201, 138, 0.12), transparent 62%),
     var(--bg);
 }
