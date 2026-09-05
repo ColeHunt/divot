@@ -352,7 +352,14 @@ button:focus-visible {
    tracing the emoji's shape. A plain glow layer only ever transitions
    opacity, which has no such failure mode. */
 .tabbar button .icon {
+  /* z-index: 0, not just position: relative, is what actually matters here:
+     without an explicit z-index this isn't a stacking context on its own, so
+     the ::before's z-index: -1 doesn't stay "just behind the icon" — it
+     escapes to the nearest ancestor that IS one, which sank it below the
+     tab bar's own opaque background. Verified painting nothing at all
+     (computed z-index: auto on this element) before this was added. */
   position: relative;
+  z-index: 0;
   display: flex;
   font-size: 1.25rem;
 }
