@@ -2,7 +2,7 @@
   <!-- Rough, filling the frame -->
   <rect width="400" height="800" fill="#16241b"/>
 
-  <g opacity="0.22">
+  <g transform="rotate(180 200 400)" opacity="0.22">
     <!-- Fairway, winding from the bottom of the screen up to the green. A thick
          stroke on a single centerline rather than a hand-filled ribbon, so its
          width is one number to tune instead of two roughly-parallel curves
@@ -18,9 +18,13 @@
     <!-- The green, at the top of the fairway -->
     <ellipse cx="255" cy="95" rx="95" ry="70" fill="#28492f"/>
 
-    <!-- Pin, planted in the green -->
-    <line x1="255" y1="95" x2="255" y2="45" stroke="#5a5f52" stroke-width="2"/>
-    <path d="M255 47 L281 58 L255 69 Z" fill="#9a8455"/>
+    <!-- Pin, planted in the green. Counter-rotated so it stays upright
+         despite the group's 180deg flip — a flag should always point up,
+         whichever way the rest of the course is turned. -->
+    <g transform="rotate(180 255 95)">
+      <line x1="255" y1="95" x2="255" y2="45" stroke="#5a5f52" stroke-width="2"/>
+      <path d="M255 47 L281 58 L255 69 Z" fill="#9a8455"/>
+    </g>
 
     <!-- Bunkers, flanking the fairway's turns -->
     <ellipse cx="70" cy="600" rx="46" ry="26" fill="#c4a86e" opacity="0.3" transform="rotate(-18 70 600)"/>
