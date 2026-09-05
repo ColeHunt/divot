@@ -12,6 +12,10 @@ interface LineChartProps {
   height?: number;
   /** Include y=0 in the plotted range and draw a faint line at it — for a to-par chart. */
   zeroLine?: boolean;
+  /** Clamp the y-axis floor to 0 after padding — for a quantity that can never
+   *  go negative, like cumulative strokes, so the bottom tick can't imply a
+   *  value the data could never actually reach. */
+  minZero?: boolean;
 }
 
 const WIDTH = 600;
@@ -58,7 +62,7 @@ export function ChartLegend({ series }: { series: ChartSeries[] }) {
 }
 
 /** A small dependency-free SVG line chart — this app has no charting library, and the data here is tiny (one point per hole). */
-export function LineChart({ categories, series, height = 200, zeroLine = false }: LineChartProps) {
+export function LineChart({ categories, series, height = 200, zeroLine = false, minZero = false }: LineChartProps) {
   const plotWidth = WIDTH - PAD_LEFT - PAD_RIGHT;
   const plotHeight = height - PAD_TOP - PAD_BOTTOM;
 
@@ -77,6 +81,7 @@ export function LineChart({ categories, series, height = 200, zeroLine = false }
   const pad = span * 0.15;
   min -= pad;
   max += pad;
+  if (minZero) min = Math.max(min, 0);
 
   const xFor = (i: number) =>
     categories.length > 1 ? PAD_LEFT + (i / (categories.length - 1)) * plotWidth : PAD_LEFT + plotWidth / 2;
