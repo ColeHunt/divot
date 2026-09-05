@@ -90,6 +90,8 @@ export interface RoundPlayer {
    * scoring lives on the player's team instead, in RoundState.teams.
    */
   scores: Record<number, number>;
+  /** Hole number -> putts. Entirely optional — a hole missing here just has no putt count recorded. */
+  putts: Record<number, number>;
 }
 
 /** A scramble team. Only present on 'scramble' rounds — empty on 'stroke_play'. */
@@ -99,6 +101,8 @@ export interface RoundTeam {
   memberUserIds: string[];
   /** Hole number -> strokes, the team's shared scorecard. */
   scores: Record<number, number>;
+  /** Hole number -> putts, the team's shared putt count. Optional, same as RoundPlayer.putts. */
+  putts: Record<number, number>;
 }
 
 export interface RoundState {
@@ -143,6 +147,7 @@ export interface RoundInvite {
 export type ClientMessage =
   | { t: 'subscribe'; code: string }
   | { t: 'set_score'; code: string; hole: number; strokes: number | null }
+  | { t: 'set_putts'; code: string; hole: number; putts: number | null }
   | { t: 'complete_round'; code: string }
   | { t: 'reopen_round'; code: string }
   | { t: 'create_team'; code: string; name?: string }

@@ -13,6 +13,7 @@ import {
   renameTeam,
   reopenRound,
   roundExists,
+  setPutts,
   setScore,
 } from './rounds.js';
 import type { ClientMessage, ServerErrorCode, ServerMessage } from '../../shared/src/types.js';
@@ -120,6 +121,13 @@ function handleMessage(session: Session, raw: string): void {
       case 'set_score': {
         const code = requireSubscribed(session);
         setScore(code, session.userId, message.hole, message.strokes, now);
+        broadcastRound(code);
+        return;
+      }
+
+      case 'set_putts': {
+        const code = requireSubscribed(session);
+        setPutts(code, session.userId, message.hole, message.putts, now);
         broadcastRound(code);
         return;
       }

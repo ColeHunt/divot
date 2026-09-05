@@ -447,6 +447,33 @@ button:focus-visible {
   margin-top: 0.3rem;
 }
 
+.putts-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+}
+
+.mini-stepper-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1;
+  flex: none;
+}
+
+.putts-value {
+  min-width: 22px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
 .player-score-row {
   display: grid;
   grid-template-columns: auto 1fr auto;

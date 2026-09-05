@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { HoleHistory, RoundTeam } from '@shared/types.js';
-import { formatToPar, holesPlayed, scoreName, toPar, totalStrokes } from '@shared/scoring.js';
+import { formatToPar, holesPlayed, scoreName, toPar, totalPutts, totalStrokes } from '@shared/scoring.js';
 import { Avatar } from '../components/Avatar.js';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
@@ -9,6 +9,8 @@ import { navigate } from '../lib/router.js';
 
 const MIN_STROKES = 1;
 const MAX_STROKES = 20;
+const MIN_PUTTS = 0;
+const MAX_PUTTS = 10;
 
 function initials(name: string): string {
   return name[0]?.toUpperCase() ?? '?';
@@ -46,6 +48,7 @@ export function Round({ code }: { code: string }) {
     error,
     fatalError,
     setScore,
+    setPutts,
     completeRound,
     reopenRound,
     createTeam,
@@ -61,6 +64,7 @@ export function Round({ code }: { code: string }) {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [pending, setPending] = useState(0);
+  const [pendingPutts, setPendingPutts] = useState<number | null>(null);
   const [holeHistory, setHoleHistory] = useState<Record<number, HoleHistory>>({});
 
   const me = useMemo(() => round?.players.find((p) => p.userId === user?.id) ?? null, [round, user]);
@@ -72,18 +76,21 @@ export function Round({ code }: { code: string }) {
   const isScramble = round?.format === 'scramble';
   const hole = round?.course.holes[holeIndex];
   const myScores = (isScramble ? myTeam?.scores : me?.scores) ?? {};
+  const myPutts = (isScramble ? myTeam?.putts : me?.putts) ?? {};
 
-  // Re-baseline the stepper when navigating to a different hole, or when the
-  // *committed* score for the hole being viewed changes — our own save
+  // Re-baseline the steppers when navigating to a different hole, or when the
+  // *committed* value for the hole being viewed changes — our own save
   // confirming over the websocket, or (in scramble) a teammate scoring the
   // same shared hole. An in-progress adjustment on this hole is otherwise
   // left alone, so it doesn't jump around mid-edit.
   const committedForHole = hole ? myScores[hole.number] : undefined;
+  const committedPuttsForHole = hole ? myPutts[hole.number] : undefined;
   useEffect(() => {
     if (!hole) return;
     setPending(committedForHole ?? hole.par);
+    setPendingPutts(committedPuttsForHole ?? null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hole?.number, committedForHole]);
+  }, [hole?.number, committedForHole, committedPuttsForHole]);
 
   useEffect(() => {
     api
@@ -317,10 +324,42 @@ export function Round({ code }: { code: string }) {
             </button>
           </div>
 
+          <div className="putts-row">
+            <span className="tiny muted">Putts</span>
+            <button
+              className="mini-stepper-btn"
+              aria-label="Decrease putts"
+              onClick={() => setPendingPutts((p) => (p == null ? null : Math.max(MIN_PUTTS, p - 1)))}
+              disabled={pendingPutts == null || pendingPutts <= MIN_PUTTS}
+            >
+              −
+            </button>
+            <span className="putts-value">{pendingPutts ?? '–'}</span>
+            <button
+              className="mini-stepper-btn"
+              aria-label="Increase putts"
+              onClick={() => setPendingPutts((p) => Math.min(MAX_PUTTS, (p ?? 0) + 1))}
+              disabled={pendingPutts != null && pendingPutts >= MAX_PUTTS}
+            >
+              +
+            </button>
+            {pendingPutts != null && (
+              <button
+                className="btn-ghost tiny"
+                style={{ padding: 0, minHeight: 0 }}
+                onClick={() => setPendingPutts(null)}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
           <button
             className="btn btn-primary btn-full"
+            style={{ marginTop: '0.85rem' }}
             onClick={() => {
               setScore(hole.number, pending);
+              setPutts(hole.number, pendingPutts);
               if (holeIndex < round.course.holes.length - 1) setHoleIndex((i) => i + 1);
             }}
           >
@@ -364,6 +403,7 @@ export function Round({ code }: { code: string }) {
                   <div className="row-name">{team.name}</div>
                   <div className="row-meta">
                     {team.memberUserIds.map(nameFor).join(', ')} · {holesPlayed(team.scores)}/{round.course.holeCount} holes
+                    {holesPlayed(team.putts) > 0 ? ` · ${totalPutts(team.putts)} putts` : ''}
                   </div>
                 </div>
                 <div>
@@ -388,6 +428,7 @@ export function Round({ code }: { code: string }) {
                   <div className="row-name">{player.name}</div>
                   <div className="row-meta">
                     {holesPlayed(player.scores)}/{round.course.holeCount} holes
+                    {holesPlayed(player.putts) > 0 ? ` · ${totalPutts(player.putts)} putts` : ''}
                   </div>
                 </div>
                 <div>

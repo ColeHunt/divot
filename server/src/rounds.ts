@@ -463,6 +463,66 @@ export function setScore(
   touch(round.id);
 }
 
+const MIN_PUTTS = 0;
+const MAX_PUTTS = 10;
+
+/** Putts are optional and tracked independently of strokes — no relationship between the two is enforced. */
+export function setPutts(
+  code: string,
+  userId: string,
+  hole: unknown,
+  putts: unknown,
+  now = Date.now(),
+): void {
+  const round = loadRound(code);
+  requirePlayer(round.id, userId);
+  requireOpen(round.status);
+
+  const holeNumber = Number(hole);
+  if (!roundHoleNumbers(round.id, round.course_id).includes(holeNumber)) {
+    throw new RoundError('bad_request', 'That hole is not part of this round');
+  }
+
+  const value = putts == null ? null : Number(putts);
+  if (value != null && (!Number.isInteger(value) || value < MIN_PUTTS || value > MAX_PUTTS)) {
+    throw new RoundError('bad_request', 'Putts must be between 0 and 10');
+  }
+
+  const db = getDb();
+
+  if (round.format === 'scramble') {
+    const teamId = findUserTeamId(round.id, userId);
+    if (!teamId) throw new RoundError('not_on_a_team', 'Join a team first');
+
+    if (value == null) {
+      db.prepare('DELETE FROM round_team_putts WHERE team_id = ? AND hole_number = ?').run(teamId, holeNumber);
+    } else {
+      db.prepare(
+        `INSERT INTO round_team_putts (round_id, team_id, hole_number, putts, updated_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(team_id, hole_number) DO UPDATE SET putts = excluded.putts, updated_at = excluded.updated_at`,
+      ).run(round.id, teamId, holeNumber, value, now);
+    }
+    touch(round.id);
+    return;
+  }
+
+  if (value == null) {
+    db.prepare('DELETE FROM round_putts WHERE round_id = ? AND user_id = ? AND hole_number = ?').run(
+      round.id,
+      userId,
+      holeNumber,
+    );
+  } else {
+    db.prepare(
+      `INSERT INTO round_putts (round_id, user_id, hole_number, putts, updated_at)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(round_id, user_id, hole_number) DO UPDATE SET putts = excluded.putts, updated_at = excluded.updated_at`,
+    ).run(round.id, userId, holeNumber, value, now);
+  }
+  touch(round.id);
+}
+
 export function completeRound(code: string, userId: string, now = Date.now()): void {
   const round = loadRound(code);
   requirePlayer(round.id, userId);
@@ -500,17 +560,23 @@ function teamsForRound(roundId: string): RoundTeam[] {
 
   const membersStmt = db.prepare('SELECT user_id FROM round_team_members WHERE team_id = ?');
   const scoresStmt = db.prepare('SELECT hole_number, strokes FROM round_team_scores WHERE team_id = ?');
+  const puttsStmt = db.prepare('SELECT hole_number, putts FROM round_team_putts WHERE team_id = ?');
 
   return teamRows.map((team) => {
     const scores: Record<number, number> = {};
     for (const row of scoresStmt.all(team.id) as Array<{ hole_number: number; strokes: number }>) {
       scores[row.hole_number] = row.strokes;
     }
+    const putts: Record<number, number> = {};
+    for (const row of puttsStmt.all(team.id) as Array<{ hole_number: number; putts: number }>) {
+      putts[row.hole_number] = row.putts;
+    }
     return {
       id: team.id,
       name: team.name,
       memberUserIds: (membersStmt.all(team.id) as Array<{ user_id: string }>).map((r) => r.user_id),
       scores,
+      putts,
     };
   });
 }
@@ -522,6 +588,15 @@ function scoresFor(roundId: string, userId: string): Record<number, number> {
   const scores: Record<number, number> = {};
   for (const row of rows) scores[row.hole_number] = row.strokes;
   return scores;
+}
+
+function puttsFor(roundId: string, userId: string): Record<number, number> {
+  const rows = getDb()
+    .prepare('SELECT hole_number, putts FROM round_putts WHERE round_id = ? AND user_id = ?')
+    .all(roundId, userId) as Array<{ hole_number: number; putts: number }>;
+  const putts: Record<number, number> = {};
+  for (const row of rows) putts[row.hole_number] = row.putts;
+  return putts;
 }
 
 export function getRoundState(code: string): RoundState {
@@ -545,6 +620,7 @@ export function getRoundState(code: string): RoundState {
       status: row.status as 'invited' | 'joined',
       joinedAt: row.joined_at,
       scores: format === 'stroke_play' ? scoresFor(round.id, row.user_id) : {},
+      putts: format === 'stroke_play' ? puttsFor(round.id, row.user_id) : {},
     };
   });
 

@@ -7,6 +7,13 @@ export function totalStrokes(scores: Record<number, number>): number {
   return total;
 }
 
+/** Sum of putts logged so far. Putts are optional, so this is 0 until anyone bothers entering any. */
+export function totalPutts(putts: Record<number, number>): number {
+  let total = 0;
+  for (const count of Object.values(putts)) total += count;
+  return total;
+}
+
 /**
  * Strokes relative to par, counting only holes that have both a score and a
  * known par. A round with holes still unscored has a partial-but-honest
