@@ -343,18 +343,37 @@ button:focus-visible {
   font-weight: 600;
 }
 
+/* A radial-gradient glow behind the icon, not filter: drop-shadow on it.
+   drop-shadow traces the element's actual rendered alpha shape, which is
+   right at first paint but not once it's *transitioning* between filter
+   values — WebKit has rasterized the settled state on load correctly, then
+   after a click (removing the filter from the old tab, adding it to the new
+   one) drawn the animating one as a solid glowing rectangle instead of
+   tracing the emoji's shape. A plain glow layer only ever transitions
+   opacity, which has no such failure mode. */
 .tabbar button .icon {
+  position: relative;
   display: flex;
   font-size: 1.25rem;
-  transition: filter 0.15s ease;
+}
+
+.tabbar button .icon::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(71, 201, 138, 0.55), transparent 70%);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: -1;
 }
 
 .tabbar button[aria-current='true'] {
   color: var(--accent);
 }
 
-.tabbar button[aria-current='true'] .icon {
-  filter: drop-shadow(0 0 6px rgba(71, 201, 138, 0.6));
+.tabbar button[aria-current='true'] .icon::before {
+  opacity: 1;
 }
 
 /* ---- hero ---- */
