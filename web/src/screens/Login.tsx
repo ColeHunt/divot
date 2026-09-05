@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { messageFor, useAuth } from '../lib/auth.js';
 import { navigate } from '../lib/router.js';
+import { Wordmark } from '../components/Wordmark.js';
 
 export function Login() {
   const { login } = useAuth();
@@ -26,7 +27,7 @@ export function Login() {
   return (
     <div className="app">
       <div className="hero">
-        <h1>⛳ Divot</h1>
+        <h1><Wordmark /></h1>
         <p className="muted">Rounds, courses and scores, with your friends.</p>
       </div>
 

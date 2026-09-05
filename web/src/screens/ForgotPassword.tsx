@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { api } from '../lib/api.js';
 import { navigate } from '../lib/router.js';
+import { Wordmark } from '../components/Wordmark.js';
 
 export function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -23,7 +24,7 @@ export function ForgotPassword() {
   return (
     <div className="app">
       <div className="hero">
-        <h1>⛳ Divot</h1>
+        <h1><Wordmark /></h1>
       </div>
 
       {sent ? (

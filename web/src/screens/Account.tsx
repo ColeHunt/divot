@@ -1,5 +1,6 @@
 import { useState, type ChangeEvent } from 'react';
 import { Avatar } from '../components/Avatar.js';
+import { PencilIcon } from '../components/icons.js';
 import { api, ApiError } from '../lib/api.js';
 import { messageFor, useAuth } from '../lib/auth.js';
 import { resizeImageToDataUrl } from '../lib/image.js';
@@ -82,7 +83,9 @@ export function Account() {
         <label className="avatar-picker">
           {user && <Avatar userId={user.id} name={user.name} large version={avatarVersion} />}
           <input type="file" accept="image/jpeg,image/png,image/webp" onChange={pickPhoto} disabled={avatarBusy} />
-          <span className="edit-badge">✎</span>
+          <span className="edit-badge">
+            <PencilIcon />
+          </span>
         </label>
         <p className="tiny muted" style={{ margin: 0 }}>Tap to change your photo</p>
         <button className="btn-ghost tiny" style={{ padding: 0, minHeight: 0 }} onClick={removePhoto} disabled={avatarBusy}>

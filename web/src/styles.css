@@ -2,14 +2,19 @@
   --bg: #0f1712;
   --surface: #17221b;
   --surface-2: #1e2c23;
+  --surface-hi: #202f24;
   --border: #2b3a30;
   --text: #eef3ee;
   --text-dim: #9db3a4;
   --accent: #47c98a;
+  --accent-2: #2c9c65;
   --accent-ink: #08251a;
+  --gold: #e8b34d;
   --danger: #e05263;
   --ok: #47c98a;
   --radius: 14px;
+  --shadow-soft: 0 10px 28px -14px rgba(0, 0, 0, 0.6);
+  --shadow-hairline: inset 0 1px 0 rgba(255, 255, 255, 0.05);
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   color-scheme: dark;
@@ -52,7 +57,14 @@ body {
   inset: 0;
   display: flex;
   flex-direction: column;
-  background: var(--bg);
+  /* A dusk sun catching the top of the frame and a fairway glow rising from
+     the bottom-left — both fully transparent by the time they'd cross a card,
+     so this only ever reads as depth behind the content, never as a color
+     shift on it. Layered over the flat var(--bg) fallback everywhere else. */
+  background:
+    radial-gradient(ellipse 120% 46% at 50% -8%, rgba(232, 179, 77, 0.14), transparent 60%),
+    radial-gradient(ellipse 130% 60% at 8% 112%, rgba(71, 201, 138, 0.12), transparent 62%),
+    var(--bg);
 }
 
 /* The canvas colour, not a background anyone sees behind content: #root paints
@@ -125,11 +137,12 @@ button:focus-visible {
 }
 
 .card {
-  background: var(--surface);
+  background: linear-gradient(180deg, var(--surface-hi), var(--surface));
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 1rem;
   margin-bottom: 0.85rem;
+  box-shadow: var(--shadow-soft), var(--shadow-hairline);
 }
 
 .card h2 {
@@ -148,10 +161,11 @@ button:focus-visible {
   gap: 0.4rem;
   padding: 0.8rem 1rem;
   border-radius: 12px;
-  background: var(--surface-2);
+  background: linear-gradient(180deg, var(--surface-hi), var(--surface-2));
   border: 1px solid var(--border);
   font-weight: 600;
   min-height: 48px;
+  box-shadow: var(--shadow-hairline);
 }
 
 .btn:active {
@@ -163,15 +177,17 @@ button:focus-visible {
 }
 
 .btn-primary {
-  background: var(--accent);
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
   color: var(--accent-ink);
   border-color: transparent;
+  box-shadow: 0 10px 22px -10px rgba(71, 201, 138, 0.55), var(--shadow-hairline);
 }
 
 .btn-ghost {
   background: none;
   border-color: var(--border);
   color: var(--text-dim);
+  box-shadow: none;
 }
 
 .btn-full {
@@ -234,10 +250,34 @@ button:focus-visible {
   padding: 0.25rem 0 0.9rem;
 }
 
+.brand,
+.hero h1 {
+  font-family: 'Fraunces', ui-rounded, -apple-system, serif;
+  font-style: italic;
+  font-weight: 600;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.brand svg,
+.hero h1 svg {
+  color: var(--gold);
+  flex: none;
+}
+
 .brand {
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  font-size: 1.15rem;
+  display: inline-flex;
+  letter-spacing: -0.01em;
+  font-size: 1.2rem;
+}
+
+/* flex, not inline-flex — h1 needs to stay block-level so it keeps stacking
+   above whatever comes after it (a subtitle, an action button); centering its
+   own icon+text pair comes from justify-content instead of the inline-level
+   trick .brand relies on. */
+.hero h1 {
+  display: flex;
+  justify-content: center;
 }
 
 .status-dot {
@@ -269,8 +309,12 @@ button:focus-visible {
   flex: none;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  background: var(--surface);
+  /* Ends the gradient at exactly var(--surface) — the same flat color
+     body.has-tabbar paints in the safe-area strip below this bar on iOS
+     standalone, so the seam between the two stays invisible. */
+  background: linear-gradient(180deg, var(--surface-hi), var(--surface));
   border-top: 1px solid var(--border);
+  box-shadow: 0 -14px 24px -18px rgba(0, 0, 0, 0.5);
   padding-bottom: var(--safe-bottom);
 }
 
@@ -291,11 +335,17 @@ button:focus-visible {
 }
 
 .tabbar button .icon {
-  font-size: 1.2rem;
+  display: flex;
+  font-size: 1.25rem;
+  transition: filter 0.15s ease;
 }
 
 .tabbar button[aria-current='true'] {
   color: var(--accent);
+}
+
+.tabbar button[aria-current='true'] .icon {
+  filter: drop-shadow(0 0 6px rgba(71, 201, 138, 0.6));
 }
 
 /* ---- hero ---- */
@@ -406,12 +456,13 @@ button:focus-visible {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: var(--accent);
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
   color: var(--accent-ink);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.8rem;
+  box-shadow: 0 4px 10px -3px rgba(71, 201, 138, 0.6);
+  font-size: 0.9rem;
   border: 2px solid var(--bg);
 }
 
