@@ -181,7 +181,7 @@ export function Round({ code }: { code: string }) {
         </div>
       </div>
 
-      <div className="card">
+      <div className="card" style={{ padding: '0.6rem 1rem' }}>
         <div className="row between">
           <div>
             <div className="row-name">{round.course.name}</div>
@@ -274,10 +274,10 @@ export function Round({ code }: { code: string }) {
       )}
 
       {!isComplete && hole && canScore && (
-        <div className="card">
+        <div className="card scoring-card">
           <div className="hole-nav">
             <button
-              className="btn btn-sm"
+              className="btn"
               onClick={() => setHoleIndex((i) => Math.max(0, i - 1))}
               disabled={holeIndex === 0}
             >
@@ -291,7 +291,7 @@ export function Round({ code }: { code: string }) {
               </div>
             </div>
             <button
-              className="btn btn-sm"
+              className="btn"
               onClick={() => setHoleIndex((i) => Math.min(round.course.holes.length - 1, i + 1))}
               disabled={holeIndex === round.course.holes.length - 1}
             >
@@ -355,8 +355,8 @@ export function Round({ code }: { code: string }) {
           </div>
 
           <button
-            className="btn btn-primary btn-full"
-            style={{ marginTop: '0.85rem' }}
+            className="btn btn-primary btn-full btn-lg"
+            style={{ marginTop: '1rem' }}
             onClick={() => {
               setScore(hole.number, pending);
               setPutts(hole.number, pendingPutts);
