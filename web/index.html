@@ -11,7 +11,16 @@
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext x='50' y='78' font-size='80' text-anchor='middle'%3E%E2%9B%B3%3C/text%3E%3C/svg%3E" />
     <link rel="manifest" href="/manifest.json" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- Deliberately NOT black-translucent. That mode hands the web view the
+         full screen so content can sit under the status bar, but WebKit's
+         initial layout viewport in a standalone home-screen app is computed
+         for the inset frame — leaving the layout viewport ~47pt shorter than
+         the real web view, so `position: fixed; bottom: 0` lands above the
+         true bottom and the strip below it is bare page canvas that no CSS in
+         the document can reach (it only corrects after a scroll re-syncs the
+         viewport). "black" gives the web view the inset frame that WebKit
+         already lays out for, so the two agree from the first paint. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="apple-mobile-web-app-title" content="Divot" />
     <title>Divot</title>
   </head>

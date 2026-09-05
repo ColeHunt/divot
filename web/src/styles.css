@@ -11,15 +11,7 @@
   --ok: #47c98a;
   --radius: 14px;
   --safe-top: env(safe-area-inset-top, 0px);
-  /* Capped at 34px — the documented home-indicator height on every current
-     iPhone — rather than trusting env() outright. Some browser contexts
-     (observed: reserved space well beyond the icon row itself, worse than
-     before the tabbar padding was already bumped once for this) report a
-     larger inset than the real hardware safe area, and there is no
-     legitimate reason our own reserve should ever need to exceed the
-     standard value. min() only ever pulls an inflated value back down to
-     34px; a device that genuinely reports less (or 0) is unaffected. */
-  --safe-bottom: min(env(safe-area-inset-bottom, 0px), 34px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
   color-scheme: dark;
 }
 
@@ -27,19 +19,21 @@
   box-sizing: border-box;
 }
 
-/* --app-height is set in main.tsx from window.visualViewport, which is a
-   more forceful fix than the dvh unit alone: on this device/iOS
-   combination, 100dvh's very first computed value was still stale on
-   load (only correcting itself once a scroll forced a recalculation),
-   leaving a gap between the fixed .tabbar and the real bottom edge until
-   then. 100dvh stays as the fallback for the instant before that JS runs. */
-html {
-  height: var(--app-height, 100dvh);
+html,
+body {
+  height: 100%;
 }
 
-body,
+/* The app shell: pinned to the viewport as one flex column, with the tab bar
+   as a static row at its end and the scrolling confined to .app inside it.
+   Nothing here depends on a fixed element resolving `bottom: 0` correctly,
+   and the document itself never scrolls, so there's no rubber-band state
+   that can leave the bar detached from the bottom edge. */
 #root {
-  height: 100%;
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 body {
@@ -51,6 +45,9 @@ body {
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior-y: none;
+  /* The shell owns the viewport and .app owns the scrolling; the document
+     itself must never scroll or rubber-band behind them. */
+  overflow: hidden;
 }
 
 button {
@@ -81,11 +78,19 @@ button:focus-visible {
   outline-offset: 2px;
 }
 
+/* The one scrolling element. min-height: 0 lets a flex child actually shrink
+   below its content height so overflow-y has something to do. The tab bar is
+   a sibling below it now, not an overlay, so no bottom reservation is needed. */
 .app {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
   max-width: 34rem;
   margin: 0 auto;
-  padding: calc(1rem + var(--safe-top)) 1rem calc(4.5rem + var(--safe-bottom));
-  min-height: 100%;
+  padding: calc(1rem + var(--safe-top)) 1rem 1rem;
 }
 
 .card {
@@ -220,23 +225,17 @@ button:focus-visible {
   background: var(--accent);
 }
 
+/* Static, not fixed: it's the last row of the #root flex column, so it sits
+   against the bottom of the shell by layout rather than by resolving
+   `bottom: 0` against a viewport rect. padding-bottom keeps the home
+   indicator clear of the tap targets. */
 .tabbar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  flex: none;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   background: var(--surface);
   border-top: 1px solid var(--border);
   padding-bottom: var(--safe-bottom);
-  z-index: 10;
-  /* Promotes this fixed element to its own compositing layer — a standard
-     workaround for iOS WebKit sometimes repainting position:fixed elements
-     lazily against a stale viewport snapshot (see the scroll nudge in
-     Nav.tsx for the other half of this fix). */
-  transform: translateZ(0);
-  will-change: transform;
 }
 
 .tabbar button {
