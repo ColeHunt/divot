@@ -72,38 +72,63 @@ function sanitiseLocation(location: unknown): string | null {
     : null;
 }
 
+function sanitiseLatitude(value: unknown): number | null {
+  const num = Number(value);
+  return value != null && Number.isFinite(num) && num >= -90 && num <= 90 ? num : null;
+}
+
+function sanitiseLongitude(value: unknown): number | null {
+  const num = Number(value);
+  return value != null && Number.isFinite(num) && num >= -180 && num <= 180 ? num : null;
+}
+
 export function createCourse(
   createdBy: string,
   name: unknown,
   location: unknown,
   holesInput: unknown,
+  latitude: unknown = null,
+  longitude: unknown = null,
   now = Date.now(),
 ): Course {
   const cleanName = sanitiseName(name);
   const cleanLocation = sanitiseLocation(location);
+  const lat = sanitiseLatitude(latitude);
+  const lng = sanitiseLongitude(longitude);
   const holes = sanitiseHoles(holesInput);
   const id = generateId();
   const db = getDb();
 
   const insertCourse = db.prepare(
-    'INSERT INTO courses (id, name, location, hole_count, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    'INSERT INTO courses (id, name, location, latitude, longitude, hole_count, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
   );
   const insertHole = db.prepare(
     'INSERT INTO course_holes (course_id, hole_number, par, yardage) VALUES (?, ?, ?, ?)',
   );
 
   db.transaction(() => {
-    insertCourse.run(id, cleanName, cleanLocation, holes.length, createdBy, now);
+    insertCourse.run(id, cleanName, cleanLocation, lat, lng, holes.length, createdBy, now);
     for (const hole of holes) insertHole.run(id, hole.number, hole.par, hole.yardage);
   })();
 
-  return { id, name: cleanName, location: cleanLocation, holeCount: holes.length, holes, createdAt: now };
+  return {
+    id,
+    name: cleanName,
+    location: cleanLocation,
+    latitude: lat,
+    longitude: lng,
+    holeCount: holes.length,
+    holes,
+    createdAt: now,
+  };
 }
 
 interface CourseRow {
   id: string;
   name: string;
   location: string | null;
+  latitude: number | null;
+  longitude: number | null;
   hole_count: number;
   created_at: number;
 }
@@ -128,6 +153,8 @@ export function getCourse(id: string): Course {
     id: row.id,
     name: row.name,
     location: row.location,
+    latitude: row.latitude,
+    longitude: row.longitude,
     holeCount: row.hole_count,
     holes: holesFor(row.id),
     createdAt: row.created_at,
@@ -138,19 +165,30 @@ export function courseExists(id: string): boolean {
   return Boolean(getDb().prepare('SELECT id FROM courses WHERE id = ?').get(id));
 }
 
-/** Admin-only (enforced by the route, not here) — replaces a course's name, location and full hole list. */
-export function updateCourse(id: string, name: unknown, location: unknown, holesInput: unknown): Course {
+/** Admin-only (enforced by the route, not here) — replaces a course's name, location, coordinates and full hole list. */
+export function updateCourse(
+  id: string,
+  name: unknown,
+  location: unknown,
+  holesInput: unknown,
+  latitude: unknown = null,
+  longitude: unknown = null,
+): Course {
   if (!courseExists(id)) throw new CourseError('not_found', 'No such course');
 
   const cleanName = sanitiseName(name);
   const cleanLocation = sanitiseLocation(location);
+  const lat = sanitiseLatitude(latitude);
+  const lng = sanitiseLongitude(longitude);
   const holes = sanitiseHoles(holesInput);
   const db = getDb();
 
   db.transaction(() => {
-    db.prepare('UPDATE courses SET name = ?, location = ?, hole_count = ? WHERE id = ?').run(
+    db.prepare('UPDATE courses SET name = ?, location = ?, latitude = ?, longitude = ?, hole_count = ? WHERE id = ?').run(
       cleanName,
       cleanLocation,
+      lat,
+      lng,
       holes.length,
       id,
     );

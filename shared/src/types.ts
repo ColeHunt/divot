@@ -29,9 +29,24 @@ export interface Course {
   id: string;
   name: string;
   location: string | null;
+  /** Geocoded from `location`, confirmed by whoever created/edited the course. Null if never resolved. */
+  latitude: number | null;
+  longitude: number | null;
   holeCount: number;
   holes: Hole[];
   createdAt: number;
+}
+
+/** A point-in-time weather reading, either live (a course right now) or historical (a round when it was played). */
+export interface WeatherSnapshot {
+  tempF: number;
+  feelsLikeF: number | null;
+  windMph: number | null;
+  condition: string;
+  conditionCode: number;
+  isDay: boolean;
+  /** When this reading is for — "now" for live weather, the round's completion time for a cached one. */
+  observedAt: number;
 }
 
 /** A trimmed-down Course for list views, without the hole-by-hole breakdown. */
@@ -164,6 +179,8 @@ export interface RoundState {
   players: RoundPlayer[];
   /** Populated for 'scramble' rounds; always empty for 'stroke_play'. */
   teams: RoundTeam[];
+  /** Weather at the course when the round was completed, fetched once and cached. Null if never fetched (no coordinates, or completed before this feature shipped). */
+  weather: WeatherSnapshot | null;
 }
 
 /** A trimmed-down RoundState for "my rounds" list views. */

@@ -51,6 +51,8 @@ export function EditCourse({ id }: { id: string }) {
         <CourseForm
           initialName={course.name}
           initialLocation={course.location ?? ''}
+          initialLatitude={course.latitude}
+          initialLongitude={course.longitude}
           initialHoles={holesToInput(course.holes)}
           submitLabel="Save changes"
           busy={busy}

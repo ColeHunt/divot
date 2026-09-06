@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import type { Hole } from '@shared/types.js';
+import { api } from '../lib/api.js';
 
 export interface HoleInput {
   number: number;
@@ -10,7 +11,15 @@ export interface HoleInput {
 export interface CourseFormValues {
   name: string;
   location: string | null;
+  latitude: number | null;
+  longitude: number | null;
   holes: { number: number; par: number; yardage: number | null }[];
+}
+
+interface GeocodeResult {
+  latitude: number;
+  longitude: number;
+  displayName: string;
 }
 
 function defaultHoles(count: number): HoleInput[] {
@@ -25,6 +34,8 @@ export function holesToInput(holes: Hole[]): HoleInput[] {
 interface CourseFormProps {
   initialName?: string;
   initialLocation?: string;
+  initialLatitude?: number | null;
+  initialLongitude?: number | null;
   initialHoles?: HoleInput[];
   submitLabel: string;
   busy: boolean;
@@ -35,6 +46,8 @@ interface CourseFormProps {
 export function CourseForm({
   initialName = '',
   initialLocation = '',
+  initialLatitude = null,
+  initialLongitude = null,
   initialHoles,
   submitLabel,
   busy,
@@ -43,9 +56,47 @@ export function CourseForm({
 }: CourseFormProps) {
   const [name, setName] = useState(initialName);
   const [location, setLocation] = useState(initialLocation);
+  const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(
+    initialLatitude != null && initialLongitude != null
+      ? { latitude: initialLatitude, longitude: initialLongitude }
+      : null,
+  );
+  const [geocoding, setGeocoding] = useState(false);
+  const [geocodeError, setGeocodeError] = useState<string | null>(null);
+  const [resolvedName, setResolvedName] = useState<string | null>(null);
   const [holes, setHoles] = useState<HoleInput[]>(
     initialHoles && initialHoles.length > 0 ? initialHoles : defaultHoles(18),
   );
+
+  function changeLocation(value: string) {
+    setLocation(value);
+    // A pin found for a previous address text no longer matches once that
+    // text changes — drop it rather than silently keep pointing at the old place.
+    setCoords(null);
+    setResolvedName(null);
+    setGeocodeError(null);
+  }
+
+  async function findOnMap() {
+    if (!location.trim()) return;
+    setGeocoding(true);
+    setGeocodeError(null);
+    try {
+      const res = await api.get<{ result: GeocodeResult | null }>(
+        `/api/geocode?query=${encodeURIComponent(location.trim())}`,
+      );
+      if (res.result) {
+        setCoords({ latitude: res.result.latitude, longitude: res.result.longitude });
+        setResolvedName(res.result.displayName || location.trim());
+      } else {
+        setGeocodeError("Couldn't find that location. Try a more specific address.");
+      }
+    } catch {
+      setGeocodeError("Couldn't look that up right now.");
+    } finally {
+      setGeocoding(false);
+    }
+  }
 
   function setHoleCount(count: number) {
     setHoles((current) => {
@@ -68,6 +119,8 @@ export function CourseForm({
     onSubmit({
       name: name.trim(),
       location: location.trim() || null,
+      latitude: coords?.latitude ?? null,
+      longitude: coords?.longitude ?? null,
       holes: holes.map((h) => ({
         number: h.number,
         par: h.par,
@@ -85,7 +138,34 @@ export function CourseForm({
         </label>
         <label className="field">
           <span>Location (optional)</span>
-          <input value={location} onChange={(e) => setLocation(e.target.value)} maxLength={80} />
+          <div className="row">
+            <input value={location} onChange={(e) => changeLocation(e.target.value)} maxLength={80} />
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={findOnMap}
+              disabled={geocoding || !location.trim()}
+            >
+              {geocoding ? 'Finding…' : 'Find on map'}
+            </button>
+          </div>
+          {coords && (
+            <p className="tiny muted" style={{ marginTop: '0.3rem' }}>
+              📍 Pinned{resolvedName ? `: ${resolvedName}` : ''} —{' '}
+              <a
+                href={`https://www.google.com/maps?q=${coords.latitude},${coords.longitude}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                view on map
+              </a>
+            </p>
+          )}
+          {geocodeError && (
+            <p className="tiny" style={{ color: 'var(--danger)', marginTop: '0.3rem' }}>
+              {geocodeError}
+            </p>
+          )}
         </label>
         <label className="field">
           <span>Holes</span>
