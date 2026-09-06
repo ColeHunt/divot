@@ -3,6 +3,7 @@ import type { HoleHistory, HoleTrend, RoundTeam } from '@shared/types.js';
 import { formatToPar, holesPlayed, scoreName, toPar, totalPutts, totalStrokes } from '@shared/scoring.js';
 import { Avatar } from '../components/Avatar.js';
 import { ChartLegend, LineChart, type ChartSeries } from '../components/LineChart.js';
+import { WeatherChip } from '../components/WeatherChip.js';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
 import { useRound } from '../lib/useRound.js';
@@ -259,6 +260,11 @@ export function Round({ code }: { code: string }) {
           </div>
           {isComplete && <span className="badge badge-accent">Final</span>}
         </div>
+        {round.weather && (
+          <div className="chip-row" style={{ marginTop: '0.6rem' }}>
+            <WeatherChip weather={round.weather} />
+          </div>
+        )}
       </div>
 
       {isScramble && !myTeam && (
@@ -409,15 +415,6 @@ export function Round({ code }: { code: string }) {
             >
               +
             </button>
-            {pendingPutts != null && (
-              <button
-                className="btn-ghost tiny"
-                style={{ padding: 0, minHeight: 0 }}
-                onClick={() => setPendingPutts(null)}
-              >
-                Clear
-              </button>
-            )}
           </div>
 
           <button

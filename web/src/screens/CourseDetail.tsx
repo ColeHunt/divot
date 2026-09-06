@@ -1,7 +1,8 @@
 import { useEffect, useState, type CSSProperties } from 'react';
-import type { Course, CourseStats, Hole, LastRound } from '@shared/types.js';
+import type { Course, CourseStats, Hole, LastRound, WeatherSnapshot } from '@shared/types.js';
 import { coursePar, formatToPar } from '@shared/scoring.js';
 import { ChartLegend, LineChart, type ChartSeries } from '../components/LineChart.js';
+import { WeatherChip } from '../components/WeatherChip.js';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
 import { navigate } from '../lib/router.js';
@@ -48,14 +49,20 @@ export function CourseDetail({ id }: { id: string }) {
   const { isAdmin } = useAuth();
   const [data, setData] = useState<DetailResponse | null>(null);
   const [stats, setStats] = useState<CourseStats | null>(null);
+  const [weather, setWeather] = useState<WeatherSnapshot | null>(null);
   const [busy, setBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     setData(null);
     setStats(null);
+    setWeather(null);
     api.get<DetailResponse>(`/api/courses/${id}`).then(setData);
     api.get<CourseStats>(`/api/courses/${id}/stats`).then(setStats);
+    api
+      .get<{ weather: WeatherSnapshot | null }>(`/api/courses/${id}/weather`)
+      .then((res) => setWeather(res.weather))
+      .catch(() => {});
   }, [id]);
 
   async function toggleSave() {
@@ -139,8 +146,29 @@ export function CourseDetail({ id }: { id: string }) {
 
       <div className="hero" style={{ padding: '0.5rem 0 1.25rem' }}>
         <h1 style={{ fontSize: '1.6rem' }}>{course.name}</h1>
-        {course.location && <p className="muted">{course.location}</p>}
+        {course.location && (
+          <p className="muted">
+            {course.location}
+            {course.latitude != null && course.longitude != null && (
+              <>
+                {' · '}
+                <a
+                  href={`https://www.google.com/maps?q=${course.latitude},${course.longitude}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  📍 View on map
+                </a>
+              </>
+            )}
+          </p>
+        )}
         <p className="tiny muted">{course.holeCount} holes · par {coursePar(course.holes)}</p>
+        {weather && (
+          <div className="chip-row" style={{ justifyContent: 'center', marginTop: '0.6rem' }}>
+            <WeatherChip weather={weather} label="Right now:" />
+          </div>
+        )}
       </div>
 
       {stats && stats.roundsPlayed > 0 && (

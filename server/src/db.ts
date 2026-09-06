@@ -101,6 +101,8 @@ function migrate(instance: Db): void {
       id         TEXT PRIMARY KEY,
       name       TEXT NOT NULL,
       location   TEXT,
+      latitude   REAL,
+      longitude  REAL,
       hole_count INTEGER NOT NULL,
       created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
       created_at INTEGER NOT NULL
@@ -139,7 +141,12 @@ function migrate(instance: Db): void {
       format       TEXT NOT NULL DEFAULT 'stroke_play',
       rev          INTEGER NOT NULL DEFAULT 0,
       started_at   INTEGER NOT NULL,
-      completed_at INTEGER
+      completed_at INTEGER,
+      -- A WeatherSnapshot (shared/src/types.ts), JSON-encoded, fetched once
+      -- when the round completes and never refreshed — the weather during a
+      -- past round doesn't change, so there's no reason to re-fetch it. Null
+      -- if the course has no coordinates or the fetch failed.
+      weather_json TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_rounds_course ON rounds(course_id);
@@ -236,4 +243,18 @@ function migrate(instance: Db): void {
 
     CREATE INDEX IF NOT EXISTS idx_round_team_putts_round ON round_team_putts(round_id);
   `);
+
+  // Columns added after initial release: CREATE TABLE IF NOT EXISTS above
+  // never touches a table that already exists, so a DB created before these
+  // existed needs them added by hand.
+  ensureColumn(instance, 'courses', 'latitude', 'REAL');
+  ensureColumn(instance, 'courses', 'longitude', 'REAL');
+  ensureColumn(instance, 'rounds', 'weather_json', 'TEXT');
+}
+
+function ensureColumn(instance: Db, table: 'courses' | 'rounds', column: string, type: string): void {
+  const columns = instance.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  if (!columns.some((c) => c.name === column)) {
+    instance.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+  }
 }

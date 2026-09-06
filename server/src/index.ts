@@ -47,6 +47,7 @@ import {
 import { isValidRoundCode, normaliseRoundCode } from './ids.js';
 import {
   RoundError,
+  attachRoundWeather,
   completeRound,
   createRound,
   declineRound,
@@ -59,6 +60,7 @@ import {
   listMyRounds,
   roundExists,
 } from './rounds.js';
+import { geocodeAddress, getLiveWeather } from './weather.js';
 import { UserError, getUserById, login, normaliseEmail, register, searchUsers, updateName } from './users.js';
 import { ProfileError, getProfileStats } from './profile.js';
 
@@ -351,7 +353,14 @@ export function createApp(): express.Express {
 
   api.post('/courses', (req: AuthedRequest, res) => {
     try {
-      const course = createCourse(req.userId!, req.body?.name, req.body?.location, req.body?.holes);
+      const course = createCourse(
+        req.userId!,
+        req.body?.name,
+        req.body?.location,
+        req.body?.holes,
+        req.body?.latitude,
+        req.body?.longitude,
+      );
       res.status(201).json({ course });
     } catch (error) {
       if (error instanceof CourseError) {
@@ -360,6 +369,16 @@ export function createApp(): express.Express {
       }
       throw error;
     }
+  });
+
+  // Looks up coordinates for a free-text address/course name, for the "find
+  // it on the map" step in the course form. Never throws — an unresolved or
+  // failed lookup just comes back as { result: null } for the client to
+  // handle (e.g. let the user try a different search).
+  api.get('/geocode', async (req: AuthedRequest, res) => {
+    const query = typeof req.query.query === 'string' ? req.query.query : '';
+    const result = await geocodeAddress(query);
+    res.json({ result });
   });
 
   api.get('/courses/:id', (req: AuthedRequest, res) => {
@@ -392,9 +411,36 @@ export function createApp(): express.Express {
     }
   });
 
+  // Live conditions at the course right now — null if it has no coordinates
+  // or the lookup failed, rather than an error, since this is just an
+  // overlay on the course page.
+  api.get('/courses/:id/weather', async (req: AuthedRequest, res) => {
+    try {
+      const course = getCourse(req.params.id!);
+      if (course.latitude == null || course.longitude == null) {
+        res.json({ weather: null });
+        return;
+      }
+      res.json({ weather: await getLiveWeather(course.latitude, course.longitude) });
+    } catch (error) {
+      if (error instanceof CourseError) {
+        res.status(errorStatus(error.code)).json({ error: error.code, message: error.message });
+        return;
+      }
+      throw error;
+    }
+  });
+
   api.patch('/courses/:id', requireAdmin, (req: AuthedRequest, res) => {
     try {
-      const course = updateCourse(req.params.id!, req.body?.name, req.body?.location, req.body?.holes);
+      const course = updateCourse(
+        req.params.id!,
+        req.body?.name,
+        req.body?.location,
+        req.body?.holes,
+        req.body?.latitude,
+        req.body?.longitude,
+      );
       res.json({ course });
     } catch (error) {
       if (error instanceof CourseError) {
@@ -512,10 +558,11 @@ export function createApp(): express.Express {
     res.json({ ok: true });
   });
 
-  api.post('/rounds/:code/complete', (req: AuthedRequest, res) => {
+  api.post('/rounds/:code/complete', async (req: AuthedRequest, res) => {
     try {
       const code = normaliseRoundCode(req.params.code ?? '');
       completeRound(code, req.userId!);
+      await attachRoundWeather(code);
       broadcastRound(code);
       res.json({ round: getRoundState(code) });
     } catch (error) {

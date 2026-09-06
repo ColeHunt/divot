@@ -4,6 +4,7 @@ import { generateId, generateRoundCode } from './ids.js';
 import { courseExists, getCourse, getHoleHistory, getHoleTrend } from './courses.js';
 import { getUserById } from './users.js';
 import { isFriend } from './friends.js';
+import { getHistoricalWeather } from './weather.js';
 import type {
   Course,
   HoleHistory,
@@ -14,6 +15,7 @@ import type {
   RoundState,
   RoundSummary,
   RoundTeam,
+  WeatherSnapshot,
 } from '../../shared/src/types.js';
 
 export class RoundError extends Error {
@@ -202,6 +204,7 @@ interface RoundRow {
   rev: number;
   started_at: number;
   completed_at: number | null;
+  weather_json: string | null;
 }
 
 function loadRound(code: string): RoundRow {
@@ -547,6 +550,27 @@ export function reopenRound(code: string, userId: string, now = Date.now()): voi
 }
 
 /**
+ * Fetches and caches the weather for a completed round's course, at the time
+ * it was completed. A no-op if it's already cached (so re-completing a round
+ * after a reopen doesn't overwrite the original reading), or if the course
+ * has no coordinates. Best-effort: getHistoricalWeather never throws, it
+ * just returns null on any failure, so this never blocks round completion.
+ */
+export async function attachRoundWeather(code: string): Promise<void> {
+  const round = loadRound(code);
+  if (round.weather_json || round.completed_at == null) return;
+
+  const course = getCourse(round.course_id);
+  if (course.latitude == null || course.longitude == null) return;
+
+  const weather = await getHistoricalWeather(course.latitude, course.longitude, round.completed_at);
+  if (!weather) return;
+
+  getDb().prepare('UPDATE rounds SET weather_json = ? WHERE id = ?').run(JSON.stringify(weather), round.id);
+  touch(round.id);
+}
+
+/**
  * Permanently deletes a round — only its creator can. Every dependent row
  * (players, scores, teams, round_holes) cascades off rounds.id, so this is
  * the one place a round's data actually goes away.
@@ -631,6 +655,15 @@ export function getRoundState(code: string): RoundState {
     };
   });
 
+  let weather: WeatherSnapshot | null = null;
+  if (round.weather_json) {
+    try {
+      weather = JSON.parse(round.weather_json) as WeatherSnapshot;
+    } catch {
+      weather = null;
+    }
+  }
+
   return {
     id: round.id,
     code: round.code,
@@ -644,6 +677,7 @@ export function getRoundState(code: string): RoundState {
     completedAt: round.completed_at,
     players,
     teams: format === 'scramble' ? teamsForRound(round.id) : [],
+    weather,
   };
 }
 
