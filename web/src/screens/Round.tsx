@@ -345,7 +345,7 @@ export function Round({ code }: { code: string }) {
         </div>
       )}
 
-      {!isComplete && hole && canScore && (
+      {hole && canScore && (
         <div className="card scoring-card">
           <div className="hole-nav">
             <button
@@ -371,75 +371,95 @@ export function Round({ code }: { code: string }) {
             </button>
           </div>
 
-          <div className="score-stepper">
-            <button
-              className="stepper-btn"
-              aria-label="Decrease strokes"
-              onClick={() => setPending((p) => Math.max(MIN_STROKES, p - 1))}
-              disabled={pending <= MIN_STROKES}
-            >
-              −
-            </button>
-            <div className="stepper-value">
-              <div className="stepper-number">{pending}</div>
-              <div className="stepper-label" style={{ color: scoreColor(pending - hole.par) }}>
-                {scoreName(pending - hole.par)}
+          {isComplete ? (
+            <div className="stat-pair" style={{ marginTop: '0.6rem' }}>
+              <div>
+                <div className="row-meta">Your score</div>
+                <div className="row-name">{myScores[hole.number] ?? '—'}</div>
+                {myScores[hole.number] != null && (
+                  <span className="tiny" style={{ color: scoreColor(myScores[hole.number]! - hole.par) }}>
+                    {scoreName(myScores[hole.number]! - hole.par)}
+                  </span>
+                )}
+              </div>
+              <div>
+                <div className="row-meta">Putts</div>
+                <div className="row-name">{myPutts[hole.number] ?? '—'}</div>
               </div>
             </div>
-            <button
-              className="stepper-btn"
-              aria-label="Increase strokes"
-              onClick={() => setPending((p) => Math.min(MAX_STROKES, p + 1))}
-              disabled={pending >= MAX_STROKES}
-            >
-              +
-            </button>
-          </div>
+          ) : (
+            <>
+              <div className="score-stepper">
+                <button
+                  className="stepper-btn"
+                  aria-label="Decrease strokes"
+                  onClick={() => setPending((p) => Math.max(MIN_STROKES, p - 1))}
+                  disabled={pending <= MIN_STROKES}
+                >
+                  −
+                </button>
+                <div className="stepper-value">
+                  <div className="stepper-number">{pending}</div>
+                  <div className="stepper-label" style={{ color: scoreColor(pending - hole.par) }}>
+                    {scoreName(pending - hole.par)}
+                  </div>
+                </div>
+                <button
+                  className="stepper-btn"
+                  aria-label="Increase strokes"
+                  onClick={() => setPending((p) => Math.min(MAX_STROKES, p + 1))}
+                  disabled={pending >= MAX_STROKES}
+                >
+                  +
+                </button>
+              </div>
 
-          <div className="putts-row">
-            <span className="tiny muted">Putts</span>
-            <button
-              className="mini-stepper-btn"
-              aria-label="Decrease putts"
-              onClick={() => setPendingPutts((p) => (p == null ? null : Math.max(MIN_PUTTS, p - 1)))}
-              disabled={pendingPutts == null || pendingPutts <= MIN_PUTTS}
-            >
-              −
-            </button>
-            <span className="putts-value">{pendingPutts ?? '–'}</span>
-            <button
-              className="mini-stepper-btn"
-              aria-label="Increase putts"
-              onClick={() => setPendingPutts((p) => Math.min(MAX_PUTTS, (p ?? 0) + 1))}
-              disabled={pendingPutts != null && pendingPutts >= MAX_PUTTS}
-            >
-              +
-            </button>
-          </div>
+              <div className="putts-row">
+                <span className="tiny muted">Putts</span>
+                <button
+                  className="mini-stepper-btn"
+                  aria-label="Decrease putts"
+                  onClick={() => setPendingPutts((p) => (p == null ? null : Math.max(MIN_PUTTS, p - 1)))}
+                  disabled={pendingPutts == null || pendingPutts <= MIN_PUTTS}
+                >
+                  −
+                </button>
+                <span className="putts-value">{pendingPutts ?? '–'}</span>
+                <button
+                  className="mini-stepper-btn"
+                  aria-label="Increase putts"
+                  onClick={() => setPendingPutts((p) => Math.min(MAX_PUTTS, (p ?? 0) + 1))}
+                  disabled={pendingPutts != null && pendingPutts >= MAX_PUTTS}
+                >
+                  +
+                </button>
+              </div>
 
-          <button
-            className="btn btn-primary btn-full btn-lg"
-            style={{ marginTop: '1rem' }}
-            onClick={() => {
-              setScore(hole.number, pending);
-              setPutts(hole.number, pendingPutts);
-              if (holeIndex < round.course.holes.length - 1) setHoleIndex((i) => i + 1);
-            }}
-          >
-            Save score
-          </button>
+              <button
+                className="btn btn-primary btn-full btn-lg"
+                style={{ marginTop: '1rem' }}
+                onClick={() => {
+                  setScore(hole.number, pending);
+                  setPutts(hole.number, pendingPutts);
+                  if (holeIndex < round.course.holes.length - 1) setHoleIndex((i) => i + 1);
+                }}
+              >
+                Save score
+              </button>
 
-          {myScores[hole.number] != null && (
-            <button
-              className="btn-ghost tiny"
-              style={{ display: 'block', margin: '0.6rem auto 0', padding: 0, minHeight: 0 }}
-              onClick={() => {
-                setScore(hole.number, null);
-                setPending(hole.par);
-              }}
-            >
-              Clear score
-            </button>
+              {myScores[hole.number] != null && (
+                <button
+                  className="btn-ghost tiny"
+                  style={{ display: 'block', margin: '0.6rem auto 0', padding: 0, minHeight: 0 }}
+                  onClick={() => {
+                    setScore(hole.number, null);
+                    setPending(hole.par);
+                  }}
+                >
+                  Clear score
+                </button>
+              )}
+            </>
           )}
 
           <HistoryChips
