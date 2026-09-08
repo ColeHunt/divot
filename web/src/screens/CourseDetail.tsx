@@ -1,12 +1,21 @@
 import { useEffect, useState, type CSSProperties } from 'react';
-import type { Course, CourseRoundHistoryEntry, CourseStats, Hole, HoleTrend, LastRound, WeatherSnapshot } from '@shared/types.js';
+import type { Course, CourseStats, Hole, LastRound, WeatherSnapshot } from '@shared/types.js';
 import { coursePar, formatToPar } from '@shared/scoring.js';
 import { ChartLegend, LineChart, type ChartSeries } from '../components/LineChart.js';
-import { HoleTrendChart } from '../components/HoleTrendChart.js';
+import { ScoreHistoryCard } from '../components/ScoreHistoryCard.js';
 import { WeatherChip } from '../components/WeatherChip.js';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
 import { navigate } from '../lib/router.js';
+
+type HolesView = 'front9' | 'back9' | 'full';
+
+/** Front 9 = first 9 holes by number, back 9 = last 9 — same split rounds.ts uses for a front/back-9 round. */
+function holesForView(holes: Hole[], view: HolesView): Hole[] {
+  if (view === 'full' || holes.length < 18) return holes;
+  const sorted = [...holes].sort((a, b) => a.number - b.number);
+  return view === 'front9' ? sorted.slice(0, 9) : sorted.slice(-9);
+}
 
 interface DetailResponse {
   course: Course;
@@ -51,10 +60,7 @@ export function CourseDetail({ id }: { id: string }) {
   const [data, setData] = useState<DetailResponse | null>(null);
   const [stats, setStats] = useState<CourseStats | null>(null);
   const [weather, setWeather] = useState<WeatherSnapshot | null>(null);
-  const [roundHistory, setRoundHistory] = useState<CourseRoundHistoryEntry[] | null>(null);
-  const [historyView, setHistoryView] = useState<'total' | number>('total');
-  const [holeTrends, setHoleTrends] = useState<Record<number, HoleTrend>>({});
-  const [loadingHoleTrend, setLoadingHoleTrend] = useState(false);
+  const [holesView, setHolesView] = useState<HolesView>('full');
   const [busy, setBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -62,31 +68,14 @@ export function CourseDetail({ id }: { id: string }) {
     setData(null);
     setStats(null);
     setWeather(null);
-    setRoundHistory(null);
-    setHoleTrends({});
-    setHistoryView('total');
+    setHolesView('full');
     api.get<DetailResponse>(`/api/courses/${id}`).then(setData);
     api.get<CourseStats>(`/api/courses/${id}/stats`).then(setStats);
-    api
-      .get<{ rounds: CourseRoundHistoryEntry[] }>(`/api/courses/${id}/round-history`)
-      .then((res) => setRoundHistory(res.rounds));
     api
       .get<{ weather: WeatherSnapshot | null }>(`/api/courses/${id}/weather`)
       .then((res) => setWeather(res.weather))
       .catch(() => {});
   }, [id]);
-
-  // Fetches a hole's trend the first time it's selected, then keeps it cached
-  // in holeTrends so flipping back and forth between holes doesn't re-fetch.
-  useEffect(() => {
-    if (historyView === 'total' || holeTrends[historyView]) return;
-    setLoadingHoleTrend(true);
-    api
-      .get<{ trend: HoleTrend }>(`/api/courses/${id}/holes/${historyView}/trend`)
-      .then((trendRes) => setHoleTrends((prev) => ({ ...prev, [historyView]: trendRes.trend })))
-      .catch(() => {})
-      .finally(() => setLoadingHoleTrend(false));
-  }, [id, historyView, holeTrends]);
 
   async function toggleSave() {
     if (!data) return;
@@ -130,16 +119,14 @@ export function CourseDetail({ id }: { id: string }) {
   const { course, lastRound } = data;
   const holes = course.holes;
   const categories = holes.map((h) => h.number);
-  const showYardage = holes.some((h) => h.yardage);
-  const scorecardColumns = 2 + (showYardage ? 1 : 0) + (lastRound ? 1 : 0);
   const sameRound = Boolean(
     stats?.bestRound && stats?.lastRound && stats.bestRound.roundId === stats.lastRound.roundId,
   );
 
-  const selectedHoleTrend = typeof historyView === 'number' ? holeTrends[historyView] ?? null : null;
-  const selectedHolePar = typeof historyView === 'number' ? holes.find((h) => h.number === historyView)?.par ?? 4 : 4;
-  const noHoleHistoryYet =
-    typeof historyView === 'number' && !loadingHoleTrend && (!selectedHoleTrend || selectedHoleTrend.personal.length === 0);
+  const showNineToggle = course.holeCount >= 18;
+  const visibleHoles = holesForView(holes, holesView);
+  const showYardage = visibleHoles.some((h) => h.yardage);
+  const scorecardColumns = 2 + (showYardage ? 1 : 0) + (lastRound ? 1 : 0);
 
   const strokesSeries: ChartSeries[] = [];
   const toParSeries: ChartSeries[] = [];
@@ -243,49 +230,10 @@ export function CourseDetail({ id }: { id: string }) {
           <p className="tiny muted" style={{ textAlign: 'center' }}>
             {stats.roundsPlayed} round{stats.roundsPlayed === 1 ? '' : 's'} played here.
           </p>
-
-          <div className="card">
-            <div className="row between">
-              <h2 style={{ margin: 0 }}>Score history</h2>
-              <select
-                value={historyView === 'total' ? 'total' : String(historyView)}
-                onChange={(e) => setHistoryView(e.target.value === 'total' ? 'total' : Number(e.target.value))}
-              >
-                <option value="total">Total score</option>
-                {course.holes.map((h) => (
-                  <option key={h.number} value={h.number}>
-                    Hole {h.number}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <p className="tiny muted" style={{ marginTop: '0.2rem' }}>Each point is one round you've played here.</p>
-
-            {historyView === 'total' ? (
-              roundHistory && roundHistory.length > 0 ? (
-                <div style={{ marginTop: '0.6rem' }}>
-                  <LineChart
-                    categories={roundHistory.map((r) =>
-                      new Date(r.playedAt).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' }),
-                    )}
-                    series={[
-                      { label: 'Strokes', color: BEST_COLOR, values: roundHistory.map((r) => r.totalStrokes) },
-                      { label: 'Par', color: PAR_COLOR, dashed: true, values: roundHistory.map(() => coursePar(course.holes)) },
-                    ]}
-                    minZero
-                  />
-                </div>
-              ) : (
-                <p className="tiny muted" style={{ marginTop: '0.6rem' }}>Not enough rounds yet.</p>
-              )
-            ) : noHoleHistoryYet ? (
-              <p className="tiny muted" style={{ marginTop: '0.6rem' }}>Not enough rounds yet.</p>
-            ) : (
-              <HoleTrendChart trend={selectedHoleTrend} par={selectedHolePar} loading={loadingHoleTrend} />
-            )}
-          </div>
         </>
       )}
+
+      <ScoreHistoryCard courseId={course.id} holes={course.holes} />
 
       <div className="card stack">
         <button className="btn btn-primary btn-full" onClick={() => navigate(`/round/new?course=${course.id}`)}>
@@ -306,15 +254,32 @@ export function CourseDetail({ id }: { id: string }) {
       )}
 
       <div className="card">
-        <h2>Scorecard</h2>
-        <div className="stack" style={{ '--scorecard-cols': scorecardColumns } as CSSProperties}>
+        <div className="row between">
+          <h2 style={{ margin: 0 }}>Scorecard</h2>
+          {showNineToggle && (
+            <div className="chip-row">
+              {(['front9', 'back9', 'full'] as const).map((view) => (
+                <button
+                  key={view}
+                  type="button"
+                  className="chip"
+                  aria-pressed={holesView === view}
+                  onClick={() => setHolesView(view)}
+                >
+                  {view === 'front9' ? 'Front 9' : view === 'back9' ? 'Back 9' : 'Full'}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="stack" style={{ '--scorecard-cols': scorecardColumns, marginTop: '0.6rem' } as CSSProperties}>
           <div className="scorecard-row scorecard-head">
             <span>Hole</span>
             <span>Par</span>
             {showYardage && <span>Yds</span>}
             {lastRound && <span>Last</span>}
           </div>
-          {course.holes.map((h) => (
+          {visibleHoles.map((h) => (
             <div className="scorecard-row" key={h.number}>
               <span>{h.number}</span>
               <span>{h.par}</span>
@@ -324,9 +289,11 @@ export function CourseDetail({ id }: { id: string }) {
           ))}
           <div className="scorecard-row scorecard-total">
             <span>Total</span>
-            <span>{coursePar(course.holes)}</span>
-            {showYardage && <span>{course.holes.reduce((sum, h) => sum + (h.yardage ?? 0), 0) || '—'}</span>}
-            {lastRound && <span>{lastRound.totalStrokes}</span>}
+            <span>{coursePar(visibleHoles)}</span>
+            {showYardage && <span>{visibleHoles.reduce((sum, h) => sum + (h.yardage ?? 0), 0) || '—'}</span>}
+            {lastRound && (
+              <span>{visibleHoles.reduce((sum, h) => sum + (lastRound.scores[h.number] ?? 0), 0) || '—'}</span>
+            )}
           </div>
         </div>
       </div>

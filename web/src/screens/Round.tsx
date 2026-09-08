@@ -3,6 +3,7 @@ import type { HoleHistory, HoleTrend, RoundTeam } from '@shared/types.js';
 import { formatToPar, holesPlayed, scoreName, toPar, totalPutts, totalStrokes } from '@shared/scoring.js';
 import { Avatar } from '../components/Avatar.js';
 import { HoleTrendChart } from '../components/HoleTrendChart.js';
+import { ScoreHistoryCard } from '../components/ScoreHistoryCard.js';
 import { WeatherChip } from '../components/WeatherChip.js';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
@@ -508,6 +509,8 @@ export function Round({ code }: { code: string }) {
           </p>
         )}
       </div>
+
+      <ScoreHistoryCard courseId={round.course.id} holes={round.course.holes} />
 
       <div className="stack">
         {isComplete ? (
