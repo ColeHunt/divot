@@ -35,7 +35,9 @@ import {
   createCourse,
   deleteCourse,
   getCourse,
+  getCourseRoundHistory,
   getCourseStats,
+  getHoleTrend,
   getLastRound,
   isSaved,
   listSavedCourses,
@@ -409,6 +411,40 @@ export function createApp(): express.Express {
       }
       throw error;
     }
+  });
+
+  api.get('/courses/:id/round-history', (req: AuthedRequest, res) => {
+    try {
+      getCourse(req.params.id!);
+      res.json({ rounds: getCourseRoundHistory(req.userId!, req.params.id!) });
+    } catch (error) {
+      if (error instanceof CourseError) {
+        res.status(errorStatus(error.code)).json({ error: error.code, message: error.message });
+        return;
+      }
+      throw error;
+    }
+  });
+
+  // Same per-hole trend used mid-round (rounds.ts's version just resolves a
+  // round code to this course id and excludes that one round) — this is the
+  // "look it up from the course page, no active round involved" entry point.
+  api.get('/courses/:id/holes/:hole/trend', (req: AuthedRequest, res) => {
+    try {
+      getCourse(req.params.id!);
+    } catch (error) {
+      if (error instanceof CourseError) {
+        res.status(errorStatus(error.code)).json({ error: error.code, message: error.message });
+        return;
+      }
+      throw error;
+    }
+    const holeNumber = Number(req.params.hole);
+    if (!Number.isInteger(holeNumber)) {
+      res.status(400).json({ error: 'bad_request', message: 'Bad hole number' });
+      return;
+    }
+    res.json({ trend: getHoleTrend(req.userId!, req.params.id!, holeNumber) });
   });
 
   // Live conditions at the course right now — null if it has no coordinates

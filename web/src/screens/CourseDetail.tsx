@@ -1,7 +1,8 @@
 import { useEffect, useState, type CSSProperties } from 'react';
-import type { Course, CourseStats, Hole, LastRound, WeatherSnapshot } from '@shared/types.js';
+import type { Course, CourseRoundHistoryEntry, CourseStats, Hole, HoleTrend, LastRound, WeatherSnapshot } from '@shared/types.js';
 import { coursePar, formatToPar } from '@shared/scoring.js';
 import { ChartLegend, LineChart, type ChartSeries } from '../components/LineChart.js';
+import { HoleTrendChart } from '../components/HoleTrendChart.js';
 import { WeatherChip } from '../components/WeatherChip.js';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
@@ -50,6 +51,10 @@ export function CourseDetail({ id }: { id: string }) {
   const [data, setData] = useState<DetailResponse | null>(null);
   const [stats, setStats] = useState<CourseStats | null>(null);
   const [weather, setWeather] = useState<WeatherSnapshot | null>(null);
+  const [roundHistory, setRoundHistory] = useState<CourseRoundHistoryEntry[] | null>(null);
+  const [historyView, setHistoryView] = useState<'total' | number>('total');
+  const [holeTrends, setHoleTrends] = useState<Record<number, HoleTrend>>({});
+  const [loadingHoleTrend, setLoadingHoleTrend] = useState(false);
   const [busy, setBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -57,13 +62,31 @@ export function CourseDetail({ id }: { id: string }) {
     setData(null);
     setStats(null);
     setWeather(null);
+    setRoundHistory(null);
+    setHoleTrends({});
+    setHistoryView('total');
     api.get<DetailResponse>(`/api/courses/${id}`).then(setData);
     api.get<CourseStats>(`/api/courses/${id}/stats`).then(setStats);
+    api
+      .get<{ rounds: CourseRoundHistoryEntry[] }>(`/api/courses/${id}/round-history`)
+      .then((res) => setRoundHistory(res.rounds));
     api
       .get<{ weather: WeatherSnapshot | null }>(`/api/courses/${id}/weather`)
       .then((res) => setWeather(res.weather))
       .catch(() => {});
   }, [id]);
+
+  // Fetches a hole's trend the first time it's selected, then keeps it cached
+  // in holeTrends so flipping back and forth between holes doesn't re-fetch.
+  useEffect(() => {
+    if (historyView === 'total' || holeTrends[historyView]) return;
+    setLoadingHoleTrend(true);
+    api
+      .get<{ trend: HoleTrend }>(`/api/courses/${id}/holes/${historyView}/trend`)
+      .then((trendRes) => setHoleTrends((prev) => ({ ...prev, [historyView]: trendRes.trend })))
+      .catch(() => {})
+      .finally(() => setLoadingHoleTrend(false));
+  }, [id, historyView, holeTrends]);
 
   async function toggleSave() {
     if (!data) return;
@@ -112,6 +135,11 @@ export function CourseDetail({ id }: { id: string }) {
   const sameRound = Boolean(
     stats?.bestRound && stats?.lastRound && stats.bestRound.roundId === stats.lastRound.roundId,
   );
+
+  const selectedHoleTrend = typeof historyView === 'number' ? holeTrends[historyView] ?? null : null;
+  const selectedHolePar = typeof historyView === 'number' ? holes.find((h) => h.number === historyView)?.par ?? 4 : 4;
+  const noHoleHistoryYet =
+    typeof historyView === 'number' && !loadingHoleTrend && (!selectedHoleTrend || selectedHoleTrend.personal.length === 0);
 
   const strokesSeries: ChartSeries[] = [];
   const toParSeries: ChartSeries[] = [];
@@ -215,6 +243,47 @@ export function CourseDetail({ id }: { id: string }) {
           <p className="tiny muted" style={{ textAlign: 'center' }}>
             {stats.roundsPlayed} round{stats.roundsPlayed === 1 ? '' : 's'} played here.
           </p>
+
+          <div className="card">
+            <div className="row between">
+              <h2 style={{ margin: 0 }}>Score history</h2>
+              <select
+                value={historyView === 'total' ? 'total' : String(historyView)}
+                onChange={(e) => setHistoryView(e.target.value === 'total' ? 'total' : Number(e.target.value))}
+              >
+                <option value="total">Total score</option>
+                {course.holes.map((h) => (
+                  <option key={h.number} value={h.number}>
+                    Hole {h.number}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <p className="tiny muted" style={{ marginTop: '0.2rem' }}>Each point is one round you've played here.</p>
+
+            {historyView === 'total' ? (
+              roundHistory && roundHistory.length > 0 ? (
+                <div style={{ marginTop: '0.6rem' }}>
+                  <LineChart
+                    categories={roundHistory.map((r) =>
+                      new Date(r.playedAt).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' }),
+                    )}
+                    series={[
+                      { label: 'Strokes', color: BEST_COLOR, values: roundHistory.map((r) => r.totalStrokes) },
+                      { label: 'Par', color: PAR_COLOR, dashed: true, values: roundHistory.map(() => coursePar(course.holes)) },
+                    ]}
+                    minZero
+                  />
+                </div>
+              ) : (
+                <p className="tiny muted" style={{ marginTop: '0.6rem' }}>Not enough rounds yet.</p>
+              )
+            ) : noHoleHistoryYet ? (
+              <p className="tiny muted" style={{ marginTop: '0.6rem' }}>Not enough rounds yet.</p>
+            ) : (
+              <HoleTrendChart trend={selectedHoleTrend} par={selectedHolePar} loading={loadingHoleTrend} />
+            )}
+          </div>
         </>
       )}
 

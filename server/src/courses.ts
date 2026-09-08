@@ -5,6 +5,7 @@ import { puttsForRoundUser, scoresForRoundUser } from './scores.js';
 import { totalStrokes, toPar } from '../../shared/src/scoring.js';
 import type {
   Course,
+  CourseRoundHistoryEntry,
   CourseStats,
   CourseSummary,
   Hole,
@@ -375,6 +376,43 @@ export function getCourseStats(userId: string, courseId: string): CourseStats {
     .reduce<LastRound | null>((best, s) => (!best || s.totalStrokes < best.totalStrokes ? s : best), null);
 
   return { roundsPlayed: stats.length, bestRound, lastRound };
+}
+
+const MAX_ROUNDS_FOR_HISTORY_CHART = 50;
+
+/**
+ * Every one of a user's completed rounds on a course, oldest first, reduced
+ * to just its totals — the data behind a "score over time" chart with each
+ * round as one point on the x-axis. Unlike getCourseStats this isn't reduced
+ * to best/last, and a round with no strokes entered at all is dropped
+ * (nothing to plot), rather than showing up as a misleading zero.
+ */
+export function getCourseRoundHistory(userId: string, courseId: string): CourseRoundHistoryEntry[] {
+  const db = getDb();
+  const rounds = db
+    .prepare(
+      `SELECT r.id, r.code, r.completed_at
+       FROM rounds r
+       JOIN round_players p ON p.round_id = r.id
+       WHERE r.course_id = ? AND p.user_id = ? AND r.status = 'completed'
+       ORDER BY r.completed_at ASC LIMIT ?`,
+    )
+    .all(courseId, userId, MAX_ROUNDS_FOR_HISTORY_CHART) as RoundRow[];
+
+  const holes = holesFor(courseId);
+  const entries: CourseRoundHistoryEntry[] = [];
+  for (const round of rounds) {
+    const scores = scoresForRoundUser(round.id, userId);
+    if (Object.keys(scores).length === 0) continue;
+    entries.push({
+      roundId: round.id,
+      code: round.code,
+      playedAt: round.completed_at,
+      totalStrokes: totalStrokes(scores),
+      toPar: toPar(scores, holes),
+    });
+  }
+  return entries;
 }
 
 const MAX_ROUNDS_FOR_HOLE_HISTORY = 20;

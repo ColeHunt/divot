@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { HoleHistory, HoleTrend, RoundTeam } from '@shared/types.js';
 import { formatToPar, holesPlayed, scoreName, toPar, totalPutts, totalStrokes } from '@shared/scoring.js';
 import { Avatar } from '../components/Avatar.js';
-import { ChartLegend, LineChart, type ChartSeries } from '../components/LineChart.js';
+import { HoleTrendChart } from '../components/HoleTrendChart.js';
 import { WeatherChip } from '../components/WeatherChip.js';
 import { api, ApiError } from '../lib/api.js';
 import { useAuth } from '../lib/auth.js';
@@ -13,10 +13,6 @@ const MIN_STROKES = 1;
 const MAX_STROKES = 20;
 const MIN_PUTTS = 0;
 const MAX_PUTTS = 10;
-
-const STROKES_COLOR = '#47c98a';
-const PUTTS_COLOR = '#f2b134';
-const PAR_COLOR = '#6b7d72';
 
 function initials(name: string): string {
   return name[0]?.toUpperCase() ?? '?';
@@ -59,26 +55,6 @@ function HistoryChips({
           </span>
         ))}
       </div>
-    </div>
-  );
-}
-
-/** Strokes-and-putts trend on one hole across past personal rounds, oldest first. */
-function HoleTrendChart({ trend, par, loading }: { trend: HoleTrend | null; par: number; loading: boolean }) {
-  if (loading) return <p className="tiny muted" style={{ marginTop: '0.6rem' }}>Loading…</p>;
-  if (!trend || trend.personal.length === 0) return null;
-
-  const categories = trend.personal.map((e) => new Date(e.playedAt).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' }));
-  const series: ChartSeries[] = [
-    { label: 'Strokes', color: STROKES_COLOR, values: trend.personal.map((e) => e.strokes) },
-    { label: 'Putts', color: PUTTS_COLOR, values: trend.personal.map((e) => e.putts) },
-    { label: 'Par', color: PAR_COLOR, dashed: true, values: trend.personal.map(() => par) },
-  ];
-
-  return (
-    <div style={{ marginTop: '0.8rem' }}>
-      <LineChart categories={categories} series={series} height={160} minZero />
-      <ChartLegend series={series} />
     </div>
   );
 }
