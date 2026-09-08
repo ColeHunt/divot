@@ -80,6 +80,15 @@ export interface CourseStats {
   lastRound: LastRound | null;
 }
 
+/** One completed round on a course, reduced to its totals — the data behind a "score over time" chart, oldest first. */
+export interface CourseRoundHistoryEntry {
+  roundId: string;
+  code: string;
+  playedAt: number;
+  totalStrokes: number;
+  toPar: number;
+}
+
 /**
  * A user's past strokes on one hole, split by the format they were earned
  * under. A 'scramble' score is the whole team's shared shot, not this

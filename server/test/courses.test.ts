@@ -6,6 +6,7 @@ import {
   CourseError,
   createCourse,
   deleteCourse,
+  getCourseRoundHistory,
   getCourseStats,
   getHoleHistory,
   getHoleTrend,
@@ -183,6 +184,45 @@ describe('getCourseStats', () => {
     const { code } = createRound(alice, { courseId: course.id });
     setScore(code, alice, 1, 4);
     expect(getCourseStats(alice, course.id)).toEqual({ roundsPlayed: 0, bestRound: null, lastRound: null });
+  });
+});
+
+describe('getCourseRoundHistory', () => {
+  it('is empty with no completed rounds', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [{ number: 1, par: 4 }]);
+    expect(getCourseRoundHistory(alice, course.id)).toEqual([]);
+  });
+
+  it('lists every completed round oldest first, unlike getCourseStats', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [{ number: 1, par: 4 }]);
+
+    const first = createRound(alice, { courseId: course.id }, 1000);
+    setScore(first.code, alice, 1, 5, 1000);
+    completeRound(first.code, alice, 2000);
+
+    const second = createRound(alice, { courseId: course.id }, 3000);
+    setScore(second.code, alice, 1, 4, 3000);
+    completeRound(second.code, alice, 4000);
+
+    const history = getCourseRoundHistory(alice, course.id);
+    expect(history.map((r) => r.code)).toEqual([first.code, second.code]);
+    expect(history.map((r) => r.totalStrokes)).toEqual([5, 4]);
+    expect(history.map((r) => r.toPar)).toEqual([1, 0]);
+    expect(history.map((r) => r.playedAt)).toEqual([2000, 4000]);
+  });
+
+  it('drops a completed round with no strokes entered', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [{ number: 1, par: 4 }]);
+    const blank = createRound(alice, { courseId: course.id });
+    completeRound(blank.code, alice);
+    expect(getCourseRoundHistory(alice, course.id)).toEqual([]);
+  });
+
+  it('only counts completed rounds', () => {
+    const course = createCourse(alice, 'Pebble Creek', null, [{ number: 1, par: 4 }]);
+    const { code } = createRound(alice, { courseId: course.id });
+    setScore(code, alice, 1, 4);
+    expect(getCourseRoundHistory(alice, course.id)).toEqual([]);
   });
 });
 
